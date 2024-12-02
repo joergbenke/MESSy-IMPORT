@@ -180,11 +180,9 @@ MODULE toy_common
     point_ids(1) = point_id
 
     ! Define field
-    ! TODO
     CALL yac_fdef_field ( &
       name, comp_id, point_ids, num_point_ids, collection_size, &
       timestep, timestep_unit, def_field)
-    ! END TODO
 
   END FUNCTION def_field
 
@@ -200,9 +198,7 @@ MODULE toy_common
     collection_size = SIZE(field, 2)
 
     ! Put field
-    ! TODO
     CALL yac_fput(field_id, num_points, collection_size, field, info, ierror)
-    ! END TODO
 
   END SUBROUTINE send_field
 
@@ -226,14 +222,10 @@ MODULE toy_common
     info = YAC_ACTION_NONE
 
     ! Get field
-    ! TODO
     CALL yac_fget(field_id, num_points, collection_size, field, info, ierror)
-    ! END TODO
 
     ! Get field name from field id
-    ! TODO
     field_name = yac_fget_field_name(field_id)
-    ! END TODO
 
     IF (info /= YAC_ACTION_NONE) THEN
       ! Print some debugging output
