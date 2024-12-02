@@ -237,15 +237,16 @@ subroutine read_grid_from_netcdf(filename)
 
   character(len = 200) :: filename
   character(len = 200) :: name
-  character(len = 30), allocatable, dimension(:) :: dimnames
+  character(len = 200), allocatable, dimension(:) :: dimnames, varnames
 
   integer :: status, xtype, ncid, ndim, nvar, natt, natts
   integer :: len, k, ndims, l1, l2, l3, k_un
   integer :: validRangeLength
   integer, allocatable, dimension(:) :: dimids, dimlengths
+  integer, allocatable, dimension(:) :: varids, vardims, vardatatype, varnatts, vardimids
 
   real, allocatable, dimension(:,:,:) :: data
-
+  
   ! Open netCDF file
   status = nf90_open(trim(filename), nf90_nowrite, ncid)
   if (status /= nf90_noerr) then
@@ -267,6 +268,7 @@ subroutine read_grid_from_netcdf(filename)
 
   ! Output of the dimensions
   allocate(dimids(ndim), dimlengths(ndim), dimnames(ndim))
+  allocate(varids(nvar), vardims(nvar), vardatatype(nvar), varnames(nvar), varnatts(nvar), vardimids(nvar))
 
   write(*, *)
   write(*, *) "----- Dimensions -----"
@@ -277,10 +279,12 @@ subroutine read_grid_from_netcdf(filename)
        write(*, *) status
        stop 'parse_nc [1]'
     endif
-    
-     dimlengths(k) = len
-     dimnames(k) = name
-     write(*, *) 'axes ', k, name, len
+
+    dimids(k) = k
+    dimlengths(k) = len
+    dimnames(k) = trim(name)
+
+    write(*, *) 'axes ', dimids(k), dimnames(k), dimlengths(k)
   enddo
 
   ! Output of the variables
@@ -295,7 +299,14 @@ subroutine read_grid_from_netcdf(filename)
        stop 'parse_nc [1]'
      endif
 
-     write(*, '(a, i3, " ", a, " ",i5, 2h::, 5i4)') 'variable ', k, trim(name(1 : 200)), ndims, dimids(1 : ndims), xtype, natts
+     varids(k) = k
+     varnames(k) = trim(name)
+     vardatatype(k) = xtype
+     vardims(k) = ndims
+     varnatts(k) = natts
+!     vardimids(k) = dimids
+     write(*,'(a,I3,a,a,a,I3,a,I3,a,I3)') "variable id", varids(k), ", varname: ", trim(varnames(k)), ", vardatatype: ", &
+          vardatatype(k), ", vardim: ", vardims(k), ", variable number of attributes: ", varnatts(k)
  
 !     if ( name(1:3) == 'lon' ) then
 !        l1 = dimlengths(dimids(1))
@@ -364,7 +375,7 @@ subroutine parse_atlist( ncid, natt, varid )
         if (len > 1) then
            allocate( rvals(len) )
            status = nf90_get_att(ncid, varid, name, rvals )
-           if (status /= .0) stop 'error calling get_att for real array'
+           if (status /= 0) stop 'error calling get_att for real array'
            write(*,'(a,3h:: ,(e12.5))') trim(name), rvals
            deallocate( rvals )
         else
