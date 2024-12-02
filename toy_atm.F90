@@ -38,7 +38,8 @@ MODULE toy_atm
   INTEGER :: field_oceanu_id
   INTEGER :: field_oceanv_id
   INTEGER :: field_iceoce_id
-
+  integer(kind = 4) :: i
+  
   ! Basic decomposed grid information
   INTEGER(kind = 4)             :: num_vertices_lon, num_vertices_lat
   INTEGER(kind = 4)             :: num_vertices, num_cells, num_vertices_per_cell
@@ -78,10 +79,10 @@ CONTAINS
     CALL MPI_Comm_rank(comp_comm, comp_rank, ierror)
 
     ! Read the grid and distribute it among all ATM processes
-    CALL read_icon_grid( &
-         grid_filename, comp_comm, cell_to_vertex, x_vertices, &
-         y_vertices, x_cells, y_cells, cell_sea_land_mask, &
-         global_cell_id)
+    !CALL read_icon_grid( &
+    !     grid_filename, comp_comm, cell_to_vertex, x_vertices, &
+    !     y_vertices, x_cells, y_cells, cell_sea_land_mask, &
+    !     global_cell_id)
     !    num_vertices = SIZE(x_vertices)
     !    num_cells = SIZE(x_cells)
     !    num_vertices_per_cell = SIZE(cell_to_vertex, 1)
@@ -89,6 +90,19 @@ CONTAINS
     call read_grid_from_netcdf(trim(file), num_vertices_lon, num_vertices_lat, num_vertices, num_cells)
     num_vertices_per_cell = 4
     write(*, *) num_vertices_lon, num_vertices_lat, num_vertices, num_cells, num_vertices_per_cell
+
+    allocate(x_vertices(num_vertices_lon))
+    allocate(y_vertices(num_vertices_lat))
+    do i = 1, num_vertices_lon
+       x_vertices(i) = -180.0 + (i - 1) * 1.0
+    end do
+    
+    do i = 1, num_vertices_lat
+       y_vertices(i) = -90.0 + (i - 1) * 1.0
+    end do
+    
+    write(*, *) x_vertices
+    write(*, *) y_vertices
 
     ! Define local part of the grid
     CALL yac_fdef_grid ( &
