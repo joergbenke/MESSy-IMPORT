@@ -40,9 +40,8 @@ MODULE toy_atm
   INTEGER :: field_iceoce_id
 
   ! Basic decomposed grid information
-  INTEGER                       :: num_vertices
-  INTEGER                       :: num_cells
-  INTEGER                       :: num_vertices_per_cell
+  INTEGER(kind = 4)             :: num_vertices_lon, num_vertices_lat
+  INTEGER(kind = 4)             :: num_vertices, num_cells, num_vertices_per_cell
   INTEGER, ALLOCATABLE          :: cell_to_vertex(:,:)
   DOUBLE PRECISION, ALLOCATABLE :: x_vertices(:)
   DOUBLE PRECISION, ALLOCATABLE :: y_vertices(:)
@@ -87,14 +86,14 @@ CONTAINS
     !    num_cells = SIZE(x_cells)
     !    num_vertices_per_cell = SIZE(cell_to_vertex, 1)
 
-    call read_grid_from_netcdf(trim(file), num_vertices, num_cells)
+    call read_grid_from_netcdf(trim(file), num_vertices_lon, num_vertices_lat, num_vertices, num_cells)
     num_vertices_per_cell = 4
-    write(*, *), num_vertices, num_cells, num_vertices_per_cell
+    write(*, *) num_vertices_lon, num_vertices_lat, num_vertices, num_cells, num_vertices_per_cell
 
     ! Define local part of the grid
     CALL yac_fdef_grid ( &
-         grid_name, num_vertices, num_cells, num_vertices_per_cell, &
-         x_vertices, y_vertices, cell_to_vertex, grid_id )
+        grid_name, num_vertices, num_cells, num_vertices_per_cell, &
+        x_vertices, y_vertices, cell_to_vertex, grid_id )
 
     ! Set global cell ids
     CALL yac_fset_global_index(global_cell_id, YAC_LOCATION_CELL, grid_id)
@@ -232,7 +231,7 @@ CONTAINS
 
 
   ! ===================== subroutine read_grid_from_netcdf =========================
-  subroutine read_grid_from_netcdf(filename, num_vertices, num_cells)
+  subroutine read_grid_from_netcdf(filename, num_vertices_lon, num_vertices_lat, num_vertices, num_cells)
     use netcdf
     implicit none
 
@@ -241,7 +240,8 @@ CONTAINS
 
     integer :: status, xtype, ncid, ndim, nvar, natt, natts
     integer :: len, k, ndims, l1, l2, l3, k_un
-    integer(kind = 4), intent(out) :: num_vertices, num_cells
+    integer(kind = 4), intent(out) :: num_vertices_lon, num_vertices_lat, num_vertices
+    integer(kind = 4), intent(out) :: num_cells
     integer, allocatable, dimension(:) :: dimids, dimlengths
     integer, allocatable, dimension(:) :: varids, vardims, vardatatype, varnatts, vardimids
 
@@ -284,18 +284,32 @@ CONTAINS
        dimlengths(k) = len
        dimnames(k) = trim(name)
 
+       ! read number vertices in longitude directions (vertex is midpoint of cell)
        if(index(dimnames(k), 'lon') /= 0) then
-          num_vertices = dimlengths(k) + 1
+          num_vertices_lon = dimlengths(k) 
        end if
 
+       ! read number vertices in lattitude directions (vertex is midpoint of cell)
        if(index(dimnames(k), 'lat') /= 0) then
-          num_cells = dimlengths(k) + 1
+          num_vertices_lat = dimlengths(k) 
        end if
 
-       write(*, *) 'axes ', dimids(k), dimnames(k), dimlengths(k)
     enddo
+    
+    ! Number of cells is product of vertices in lat and lon direction
+    num_cells = num_vertices_lon * num_vertices_lat
+    write(*, *) "num_cells: ", num_cells
 
-    ! Output of the variables
+    ! Now correction to number of vertices if vertex is on a real node and not in cell center
+    num_vertices_lon = num_vertices_lon + 1
+    num_vertices_lat = num_vertices_lat + 1 
+    write(*, *) num_vertices_lon, num_vertices_lat
+
+    num_vertices = num_vertices_lon * num_vertices_lat
+    write(*, *) "num_vertices: ", num_vertices
+    !write(*, *) 'axes ', dimids(k), dimnames(k), dimlengths(k)
+
+       ! Output of the variables
     write(*, *)
     write(*, *) "----- Variables -----"
     do k = 1, nvar
