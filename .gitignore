@@ -1,0 +1,12 @@
+YAC
+.ipynb_checkpoints
+grids
+*.o
+*.mod
+*.x
+sst_weights.nc
+sst_weights.png
+sst.nc
+sst.png
+metadata.yaml
+misc/
