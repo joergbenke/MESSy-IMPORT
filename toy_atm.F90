@@ -69,19 +69,14 @@ CONTAINS
 
 
     ! Read coupling configuration file
-    ! TODO
     CALL yac_fread_config_yaml(yaml_filename)
-    ! END TODO
 
     ! Define local component
-    ! TODO
     CALL yac_fdef_comp(comp_name, comp_id)
-    ! END TODO
 
     ! Retrieve communicator for ATM component
-    ! TODO
     CALL yac_fget_comp_comm(comp_id, comp_comm)
-    ! END TODO
+
     CALL MPI_Comm_rank(comp_comm, comp_rank, ierror)
 
     ! Read the grid and distribute it among all ATM processes
@@ -97,23 +92,17 @@ CONTAINS
 
     
     ! Define local part of the grid
-    ! TODO
     CALL yac_fdef_grid ( &
          grid_name, num_vertices, num_cells, num_vertices_per_cell, &
          x_vertices, y_vertices, cell_to_vertex, grid_id )
-    ! END TODO
 
     ! Set global cell ids
-    ! TODO
     CALL yac_fset_global_index(global_cell_id, YAC_LOCATION_CELL, grid_id)
-    ! END TODO
 
     ! Define location of the actual data (on cell centers)
-    ! TODO
     CALL yac_fdef_points ( &
          grid_id, num_cells, YAC_LOCATION_CELL, &
          x_cells, y_cells, cell_point_id )
-    ! END TODO
 
     !   ! Set mask for cell centers
     !   CALL yac_fset_mask(cell_sea_land_mask >= 0, cell_point_id)
@@ -125,9 +114,7 @@ CONTAINS
          field_oceanu_id, field_oceanv_id, field_iceoce_id)
 
     ! Complete definitions and compute interpolations
-    ! TODO
     CALL yac_fenddef()
-    ! END TODO
 
     ! Initialise fields
     CALL init_fields()
@@ -259,6 +246,7 @@ subroutine read_grid_from_netcdf(filename)
 
   real, allocatable, dimension(:,:,:) :: data
 
+  ! Open netCDF file
   status = nf90_open(trim(filename), nf90_nowrite, ncid)
   if (status /= nf90_noerr) then
      write(*, *) 'could not open::', filename
@@ -267,6 +255,8 @@ subroutine read_grid_from_netcdf(filename)
   endif
 
   ! Inquiry of the nuber of variables, etc
+  write(*, *)
+  write(*, *) "----- Inquire number of dimensions, variables, etc -----"
   status = nf90_inquire( ncid, ndim, nvar, natt, k_un )
   if (status /= nf90_noerr) then
      write(*, *) 'nf90_inquire error'
@@ -423,17 +413,13 @@ PROGRAM main_atm_program
   CALL MPI_Init(ierror)
 
   ! Initialise the YAC
-  ! TODO
   CALL yac_finit()
-  ! END TODO
 
   ! Run atmosphere model
   CALL main_atm(MPI_COMM_WORLD)
 
   ! Finalise YAC
-  ! TODO
   CALL yac_ffinalize()
-  ! END TODO
 
   ! Finalise MPI
   CALL MPI_Finalize(ierror)
