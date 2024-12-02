@@ -308,17 +308,22 @@ subroutine read_grid_from_netcdf(filename)
      write(*,'(a,I3,a,a,a,I3,a,I3,a,I3)') "variable id", varids(k), ", varname: ", trim(varnames(k)), ", vardatatype: ", &
           vardatatype(k), ", vardim: ", vardims(k), ", variable number of attributes: ", varnatts(k)
  
-!     if ( name(1:3) == 'lon' ) then
+     if(index(varnames(k), 'lon') /= 0) then
+        write(*, *) "lon found"
 !        l1 = dimlengths(dimids(1))
 !        l2 = dimlengths(dimids(2))
 !        l3 = dimlengths(dimids(3))
 !        allocate( data(l1, l2, l3) )
 !        status = nf90_get_var( ncid, k, data, (/ 1,1,1 /) )
-!     end if
+     end if
+
+     if(index(varnames(k), 'lat') /= 0) then
+        write(*, *) "lat found"
+     end if
      
-     if (natts > 0) then
+     if(natts > 0) then
        write(* ,*) '==== data attributes ===='
-       call parse_atlist( ncid, natts, k )
+       call parse_atlist(ncid, natts, k)
        write(*, *)
       endif
 
