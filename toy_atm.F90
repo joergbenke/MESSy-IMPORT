@@ -296,33 +296,29 @@ subroutine read_grid_from_netcdf(filename)
      endif
 
      write(*, '(a, i3, " ", a, " ",i5, 2h::, 5i4)') 'variable ', k, trim(name(1 : 200)), ndims, dimids(1 : ndims), xtype, natts
-
-!     status = nf90_inquire_attribute(ncid, k, 'lon', len = validrangelength)
-!N     if (status /= nf90_noerr) then
-!       write(*, *) "n90_inquire_attribute error"
-!       write(*, *) status
-!       stop 'parse_nc [1]'
-!     endif
-
+ 
 !     if ( name(1:3) == 'lon' ) then
 !        l1 = dimlengths(dimids(1))
 !        l2 = dimlengths(dimids(2))
 !        l3 = dimlengths(dimids(3))
 !        allocate( data(l1, l2, l3) )
 !        status = nf90_get_var( ncid, k, data, (/ 1,1,1 /) )
-        
-        if (natts > 0) then
-           write(* ,*) '==== data attributes ===='
-           call parse_atlist( ncid, natts, k )
-        endif
- !    endif
-  enddo
+!     end if
+     
+     if (natts > 0) then
+       write(* ,*) '==== data attributes ===='
+       call parse_atlist( ncid, natts, k )
+       write(*, *)
+      endif
+
+   enddo
 
   ! Output of the attributes
   write(*, *) "----- Attributes -----"
   if(natt > 0) then
      write(*, *) '==== global attributes ===='
      call parse_atlist(ncid, natt, nf90_global)
+     write(*, *)
   endif
 
 end subroutine read_grid_from_netcdf
@@ -333,13 +329,13 @@ subroutine parse_atlist( ncid, natt, varid )
   
   character (len = 256) :: c1d
   character (len = 128) :: name
-  integer :: ncid, natt, varid
-  integer :: xtype, len
-  integer :: k, kk, status
-  real :: rval
+  integer(kind = 4) :: ncid, natt, varid
+  integer(kind = 4) :: xtype, len
+  integer(kind = 4) :: k, kk, status
+  real(kind = 8) :: rval
 
-  integer, allocatable, dimension(:) :: ivals
-  real, allocatable, dimension(:) :: rvals
+  integer(kind = 4), allocatable, dimension(:) :: ivals
+  real(kind = 8), allocatable, dimension(:) :: rvals
 
   do k = 1, natt
      status = nf90_inq_attname(ncid, varid, k, name)
@@ -347,48 +343,46 @@ subroutine parse_atlist( ncid, natt, varid )
 
      if (xtype == NF90_CHAR) then
         if (len > 256) then
-           write(*,*) 'truncating attribute to length:',256
+           write(*,*) 'truncating attribute to length:', 256
         endif
         status = nf90_get_att(ncid, varid, name, c1d )
-        if (status.ne.0) stop 'error calling get_att'
+        if (status /= 0) stop 'error calling get_att'
         write(*, '(a," ", a)') trim(name), trim(c1d)
-     else if ( xtype.eq.NF90_INT ) then
-        if (len.gt.1) then
+     else if ( xtype == NF90_INT ) then
+        if (len > 1) then
            allocate( ivals(len) )
            status = nf90_get_att(ncid, varid, name, ivals )
-           if (status.ne.0) stop &
-                'error calling get_att for integer array'
+           if (status /= 0) stop "error calling get_att for integer array"
            write(*,'(a,3h:: ,(i6))') trim(name), ivals
            deallocate( ivals )
         else
            status = nf90_get_att(ncid, varid, name, ivals )
-           if (status.ne.0) stop 'error calling get_att for integer'
+           if (status /= 0) stop 'error calling get_att for integer'
            write(6,'(a,3h:: ,(i6))') trim(name), ivals
         endif
-     else if( xtype.eq.NF90_FLOAT ) then
-        if (len.gt.1) then
+     else if( xtype == NF90_FLOAT ) then
+        if (len > 1) then
            allocate( rvals(len) )
            status = nf90_get_att(ncid, varid, name, rvals )
-           if (status.ne.0) stop 'error calling get_att for real array'
+           if (status /= .0) stop 'error calling get_att for real array'
            write(*,'(a,3h:: ,(e12.5))') trim(name), rvals
            deallocate( rvals )
         else
            status = nf90_get_att(ncid, varid, name, rval )
-           if(status.ne.0) stop 'error calling get_att for real'
-           write(6,'(a,3h:: ,(e12.5))') trim(name), rval
+           if(status /= 0) stop "error calling get_att for real"
+           write(6, '(a,3h:: ,(e12.5))') trim(name), rval
         endif
-     else if( xtype.eq.NF90_DOUBLE ) then
-!        write(6,*)  'WARNING:: not programmed for double global attribute'
-        if (len.gt.1) then
+     else if( xtype == NF90_DOUBLE ) then
+        if (len > 1) then
            allocate( rvals(len) )
            status = nf90_get_att(ncid, varid, name, rvals )
-           if (status.ne.0) stop 'error calling get_att for real array'
-           write(*,'(a,3h:: ,(e12.5))') trim(name), rvals
+           if (status /= 0) stop "error calling get_att for real array"
+           write(*, '(a,3h:: ,(e12.5))') trim(name), rvals
            deallocate( rvals )
         else
            status = nf90_get_att(ncid, varid, name, rval )
-           if(status .ne. 0) stop 'error calling get_att for real'
-           write(6,'(a,3h:: ,(e12.5))') trim(name), rval
+           if(status /= 0) stop "error calling get_att for real"
+           write(6, '(a,3h:: ,(e12.5))') trim(name), rval
         endif
 
      endif
