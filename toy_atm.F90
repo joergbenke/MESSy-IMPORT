@@ -38,7 +38,7 @@ MODULE toy_atm
   INTEGER :: field_oceanu_id
   INTEGER :: field_oceanv_id
   INTEGER :: field_iceoce_id
-  integer(kind = 4) :: i
+  integer(kind = 4) :: i, j
   
   ! Basic decomposed grid information
   INTEGER(kind = 4)             :: num_vertices_lon, num_vertices_lat
@@ -91,6 +91,7 @@ CONTAINS
     num_vertices_per_cell = 4
     write(*, *) num_vertices_lon, num_vertices_lat, num_vertices, num_cells, num_vertices_per_cell
 
+    ! Allocate and fill the vertex arrays (for longitude and lattitude
     allocate(x_vertices(num_vertices_lon))
     allocate(y_vertices(num_vertices_lat))
     do i = 1, num_vertices_lon
@@ -103,6 +104,19 @@ CONTAINS
     
     write(*, *) x_vertices
     write(*, *) y_vertices
+
+    ! Allocate and fill the arry cell_to_vertex with the vertices of the elements
+    allocate(cell_to_vertex(num_cells, 4))
+
+    ! Create the numerbing of the cells (column wise; from bottom totop)
+    do i = 1, num_cells
+       cell_to_vertex(i, 1) = 1 + (i / num_vertices_lat) * num_vertices_lat
+       cell_to_vertex(i, 2) = 2 + (i / num_vertices_lat) * num_vertices_lat
+       cell_to_vertex(i, 3) = 6 + (i / num_vertices_lat) * num_vertices_lat
+       cell_to_vertex(i, 4) = 7 + (i / num_vertices_lat) * num_vertices_lat
+    end do
+    write(*, *) cell_to_vertex
+    
 
     ! Define local part of the grid
     CALL yac_fdef_grid ( &
