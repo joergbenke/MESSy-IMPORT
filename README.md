@@ -1,12 +1,15 @@
 # YAC Tutorial
 
-This is a guided tutorial for the usage of Yet Another Coupler [YAC](https://dkrz-sw.gitlab-pages.dkrz.de/yac/).
+This repo contains the prototypical stand-alone input server for MESSy (). It is written in Fortran and is based on the usage of
+Yet Another Coupler [YAC](https://dkrz-sw.gitlab-pages.dkrz.de/yac/). This repo builds upon the repository of the YAC tutorial
+(see https://gitlab.dkrz.de/YAC/2407_tutorial) which was written by Moritz Hanke (DKRZ, Hamburg).
 
-## Instructions
+# Instructions
+To compile and run the following steps have to be done (only tested on Levante (DKRZ)):
+- Compile toy models:
+  - source ./activate_levante_env
+  - make
+- Run job
+  - adapt run script job_run.sbatch
+  - sbatch job_run.sbatch
 
-- check out the `main` branch of this repository:
-
-    `git clone --depth=1 -b main`
-
-- log into [Jupyterhub @ DKRZ](https://jupyterhub.dkrz.de/hub/login?next=%2Fhub%2Fhome)
-- work through Jupyter Notebooks `Task_0.ipynb` to `Task_4.ipynb`
