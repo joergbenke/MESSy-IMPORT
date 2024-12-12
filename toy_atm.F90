@@ -89,6 +89,7 @@ CONTAINS
 
     call read_grid_from_netcdf(trim(file), num_vertices_lon, num_vertices_lat, num_vertices, num_cells)
     num_vertices_per_cell = 4
+    write(*, *) "Values"
     write(*, *) num_vertices_lon, num_vertices_lat, num_vertices, num_cells, num_vertices_per_cell
 
     ! Allocate and fill the vertex arrays (for longitude and lattitude
@@ -107,6 +108,7 @@ CONTAINS
 
     ! Allocate and fill the arry cell_to_vertex with the vertices of the elements
     allocate(cell_to_vertex(num_cells, 4))
+    write(*, *) "Size: ", size(cell_to_vertex, dim=1)
 
     ! Create the numerbing of the cells (column wise; from bottom totop)
     do i = 1, num_cells
@@ -114,9 +116,14 @@ CONTAINS
        cell_to_vertex(i, 2) = 2 + (i / num_vertices_lat) * num_vertices_lat
        cell_to_vertex(i, 3) = 6 + (i / num_vertices_lat) * num_vertices_lat
        cell_to_vertex(i, 4) = 7 + (i / num_vertices_lat) * num_vertices_lat
+       write(*, *) "element number: ", i, ", num_cells: ", num_cells
+       write(*, *) cell_to_vertex(i, 1), cell_to_vertex(i, 2), cell_to_vertex(i, 3), cell_to_vertex(i, 4)
     end do
-    write(*, *) cell_to_vertex
-    
+
+!     write(*, *) "Size: ", size(cell_to_vertex)
+!    do i = 1, num_cells
+!      write(*, *) cell_to_vertex(i, 1), cell_to_vertex(i, 2), cell_to_vertex(i, 3), cell_to_vertex(i, 4)
+!    end do  
 
     ! Define local part of the grid
     CALL yac_fdef_grid ( &
@@ -124,7 +131,7 @@ CONTAINS
         x_vertices, y_vertices, cell_to_vertex, grid_id )
 
     ! Set global cell ids
-    CALL yac_fset_global_index(global_cell_id, YAC_LOCATION_CELL, grid_id)
+    ! CALL yac_fset_global_index(global_cell_id, YAC_LOCATION_CELL, grid_id)
 
     ! Define location of the actual data (on cell centers)
     CALL yac_fdef_points ( &
@@ -157,8 +164,11 @@ CONTAINS
 
     END DO ! time loop
 
+    deallocate(cell_to_vertex)
+    
   END SUBROUTINE main_atm
 
+  
   SUBROUTINE init_fields()
 
     ! Allocate output field buffers
