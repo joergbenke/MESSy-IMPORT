@@ -112,10 +112,19 @@ CONTAINS
 
     ! Create the numerbing of the cells (column wise; from bottom totop)
     do i = 1, num_cells
-       cell_to_vertex(i, 1) = 1 + (i / num_vertices_lat) * num_vertices_lat
-       cell_to_vertex(i, 2) = 2 + (i / num_vertices_lat) * num_vertices_lat
-       cell_to_vertex(i, 3) = 6 + (i / num_vertices_lat) * num_vertices_lat
-       cell_to_vertex(i, 4) = 7 + (i / num_vertices_lat) * num_vertices_lat
+       !if ( ((i / (num_vertices_lat - 1)) == 0) .or. (mod(i,(num_vertices_lat - 1)) == 0) ) then
+       if(i < num_vertices_lat) then
+          cell_to_vertex(i, 1) = 1 + (i - 1)
+          cell_to_vertex(i, 2) = 2 + (i - 1) 
+          cell_to_vertex(i, 3) = 6 + (i - 1) ! number + (i / num_vertices_lat) * num_vertices_lat
+          cell_to_vertex(i, 4) = 7 + (i - 1)
+       else
+          cell_to_vertex(i, 1) = cell_to_vertex(i - (num_vertices_lat - 1), 3)
+          cell_to_vertex(i, 2) = cell_to_vertex(i - (num_vertices_lat - 1), 4) 
+          cell_to_vertex(i, 3) = cell_to_vertex(i, 1) + num_vertices_lat  !6 + i ! number + (i / num_vertices_lat) * num_vertices_lat
+          cell_to_vertex(i, 4) = cell_to_vertex(i, 2) + num_vertices_lat  !7 + i
+       end if   
+       
        write(*, *) "element number: ", i, ", num_cells: ", num_cells
        write(*, *) cell_to_vertex(i, 1), cell_to_vertex(i, 2), cell_to_vertex(i, 3), cell_to_vertex(i, 4)
     end do
