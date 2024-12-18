@@ -39,16 +39,18 @@ MODULE toy_ocn
   INTEGER :: field_oceanu_id
   INTEGER :: field_oceanv_id
   INTEGER :: field_iceoce_id
-
+  integer :: i, j
+  
   ! Basic decomposed grid information
-  INTEGER                       :: num_vertices
-  INTEGER                       :: num_cells
-  INTEGER                       :: num_vertices_per_cell
+  INTEGER(kind = 4)             :: num_vertices_lon, num_vertices_lat
+  INTEGER(kind = 4)             :: num_vertices, num_cells, num_vertices_per_cell
   INTEGER, ALLOCATABLE          :: cell_to_vertex(:,:)
+
   DOUBLE PRECISION, ALLOCATABLE :: x_vertices(:)
   DOUBLE PRECISION, ALLOCATABLE :: y_vertices(:)
   DOUBLE PRECISION, ALLOCATABLE :: x_cells(:)
   DOUBLE PRECISION, ALLOCATABLE :: y_cells(:)
+
   INTEGER, ALLOCATABLE          :: cell_sea_land_mask(:)
   INTEGER, ALLOCATABLE          :: global_cell_id(:)
 
@@ -62,6 +64,7 @@ CONTAINS
 
   SUBROUTINE main_ocn(comm)
     INTEGER, INTENT(IN) :: comm
+    character(len = 200) :: file = 'grids/GEIA_MPIC1.0_X_bioland_NH3_2000-2000.nc' 
 
     comp_comm = comm
 
@@ -77,14 +80,52 @@ CONTAINS
     CALL MPI_Comm_rank(comp_comm, comp_rank, ierror)
 
     ! Read the grid and distribute it among all OCN processes
-    CALL read_icon_grid( &
-         grid_filename, comp_comm, cell_to_vertex, x_vertices, &
-         y_vertices, x_cells, y_cells, cell_sea_land_mask, global_cell_id)
-    num_vertices = SIZE(x_vertices)
-    num_cells = SIZE(x_cells)
-    num_vertices_per_cell = SIZE(cell_to_vertex, 1)
+!    CALL read_icon_grid( &
+!         grid_filename, comp_comm, cell_to_vertex, x_vertices, &
+!         y_vertices, x_cells, y_cells, cell_sea_land_mask, global_cell_id)
+!    num_vertices = SIZE(x_vertices)
+!    num_cells = SIZE(x_cells)
+!    num_vertices_per_cell = SIZE(cell_to_vertex, 1)
 
     ! Define local part of the grid
+    call read_grid_from_netcdf(trim(file), num_vertices_lon, num_vertices_lat, num_vertices, num_cells)
+    num_vertices_per_cell = 4
+    write(*, *) "Values"
+    write(*, *) num_vertices_lon, num_vertices_lat, num_vertices, num_cells, num_vertices_per_cell
+
+    ! Allocate and fill the vertex arrays (for longitude and lattitude
+    allocate(x_vertices(num_vertices_lon))
+    allocate(y_vertices(num_vertices_lat))
+    do i = 1, num_vertices_lon
+       x_vertices(i) = -180.0 + (i - 1) * 1.0
+    end do
+    
+    do i = 1, num_vertices_lat
+       y_vertices(i) = -90.0 + (i - 1) * 1.0
+    end do
+    
+    write(*, *) x_vertices
+    write(*, *) y_vertices
+
+    ! Allocate and fill the arry cell_to_vertex with the vertices of the elements
+    allocate(cell_to_vertex(num_cells, 4))
+    write(*, *) "Size: ", size(cell_to_vertex, dim=1)
+
+    ! Create the numerbing of the cells (column wise; from bottom totop)
+    do i = 1, num_cells
+       cell_to_vertex(i, 1) = 1 + (i / num_vertices_lat) * num_vertices_lat
+       cell_to_vertex(i, 2) = 2 + (i / num_vertices_lat) * num_vertices_lat
+       cell_to_vertex(i, 3) = 6 + (i / num_vertices_lat) * num_vertices_lat
+       cell_to_vertex(i, 4) = 7 + (i / num_vertices_lat) * num_vertices_lat
+       write(*, *) "element number: ", i, ", num_cells: ", num_cells
+       write(*, *) cell_to_vertex(i, 1), cell_to_vertex(i, 2), cell_to_vertex(i, 3), cell_to_vertex(i, 4)
+    end do
+
+!     write(*, *) "Size: ", size(cell_to_vertex)
+!    do i = 1, num_cells
+!      write(*, *) cell_to_vertex(i, 1), cell_to_vertex(i, 2), cell_to_vertex(i, 3), cell_to_vertex(i, 4)
+!    end do  
+
     CALL yac_fdef_grid ( &
          grid_name, num_vertices, num_cells, num_vertices_per_cell, &
          x_vertices, y_vertices, cell_to_vertex, grid_id )
@@ -226,6 +267,205 @@ CONTAINS
     CALL receive_field(comp_name, field_iceatm_id, iceatm)
 
   END SUBROUTINE couple_to_atm
+
+
+    ! ===================== subroutine read_grid_from_netcdf =========================
+  subroutine read_grid_from_netcdf(filename, num_vertices_lon, num_vertices_lat, num_vertices, num_cells)
+    use netcdf
+    implicit none
+
+    character(len = 200) :: filename, name
+    character(len = 200), allocatable, dimension(:) :: dimnames, varnames
+
+    integer :: status, xtype, ncid, ndim, nvar, natt, natts
+    integer :: len, k, ndims, l1, l2, l3, k_un
+    integer(kind = 4), intent(out) :: num_vertices_lon, num_vertices_lat, num_vertices
+    integer(kind = 4), intent(out) :: num_cells
+    integer, allocatable, dimension(:) :: dimids, dimlengths
+    integer, allocatable, dimension(:) :: varids, vardims, vardatatype, varnatts, vardimids
+
+    real, allocatable, dimension(:,:,:) :: data
+
+    ! Open netCDF file
+    status = nf90_open(trim(filename), nf90_nowrite, ncid)
+    if (status /= nf90_noerr) then
+       write(*, *) 'could not open::', filename
+       write(*, *) status
+       stop 'parse_nc [1]'
+    endif
+
+    ! Inquiry of the nuber of variables, etc
+    write(*, *)
+    write(*, *) "----- Inquire number of dimensions, variables, etc -----"
+    status = nf90_inquire(ncid, ndim, nvar, natt, k_un)
+    if (status /= nf90_noerr) then
+       write(*, *) 'nf90_inquire error'
+       write(*, *) status
+       stop 'parse_nc [1]'
+    endif
+    write(*, *) 'ndim, nvar, natt, k_un:', ndim, nvar, natt, k_un
+
+    ! Output of the dimensions
+    allocate(dimids(ndim), dimlengths(ndim), dimnames(ndim))
+    allocate(varids(nvar), vardims(nvar), vardatatype(nvar), varnames(nvar), varnatts(nvar), vardimids(nvar))
+
+    write(*, *)
+    write(*, *) "----- Dimensions -----"
+    do k = 1, ndim
+       status = nf90_inquire_dimension(ncid, k, name, len)
+       if (status /= nf90_noerr) then
+          write(*, *) "n90_inquire_dimension error"
+          write(*, *) status
+          stop 'parse_nc [1]'
+       endif
+
+       dimids(k) = k
+       dimlengths(k) = len
+       dimnames(k) = trim(name)
+
+       ! read number vertices in longitude directions (vertex is midpoint of cell)
+       if(index(dimnames(k), 'lon') /= 0) then
+          num_vertices_lon = dimlengths(k) 
+       end if
+
+       ! read number vertices in lattitude directions (vertex is midpoint of cell)
+       if(index(dimnames(k), 'lat') /= 0) then
+          num_vertices_lat = dimlengths(k) 
+       end if
+
+    enddo
+    
+    ! Number of cells is product of vertices in lat and lon direction
+    num_cells = num_vertices_lon * num_vertices_lat
+    write(*, *) "num_cells: ", num_cells
+
+    ! Now correction to number of vertices if vertex is on a real node and not in cell center
+    num_vertices_lon = num_vertices_lon + 1
+    num_vertices_lat = num_vertices_lat + 1 
+    write(*, *) num_vertices_lon, num_vertices_lat
+
+    num_vertices = num_vertices_lon * num_vertices_lat
+    write(*, *) "num_vertices: ", num_vertices
+    !write(*, *) 'axes ', dimids(k), dimnames(k), dimlengths(k)
+
+       ! Output of the variables
+    write(*, *)
+    write(*, *) "----- Variables -----"
+    do k = 1, nvar
+       name = ''
+       status = nf90_inquire_variable(ncid, k, name, xtype, ndims, dimids, natts)
+       if (status /= nf90_noerr) then
+          write(*, *) "n90_inquire_variable error"
+          write(*, *) status
+          stop 'parse_nc [1]'
+       endif
+
+       varids(k) = k
+       varnames(k) = trim(name)
+       vardatatype(k) = xtype
+       vardims(k) = ndims
+       varnatts(k) = natts
+       !     vardimids(k) = dimids
+       write(*,'(a,I3,a,a,a,I3,a,I3,a,I3)') "variable id", varids(k), ", varname: ", trim(varnames(k)), ", vardatatype: ", &
+            vardatatype(k), ", vardim: ", vardims(k), ", variable number of attributes: ", varnatts(k)
+
+       if(index(varnames(k), 'lon') /= 0) then
+          write(*, *) "lon found"
+          !        l1 = dimlengths(dimids(1))
+          !        l2 = dimlengths(dimids(2))
+          !        l3 = dimlengths(dimids(3))
+          !        allocate( data(l1, l2, l3) )
+          !        status = nf90_get_var( ncid, k, data, (/ 1,1,1 /) )
+       end if
+
+       if(index(varnames(k), 'lat') /= 0) then
+          write(*, *) "lat found"
+       end if
+
+       if(natts > 0) then
+          write(* ,*) '==== data attributes ===='
+          call parse_atlist(ncid, natts, k)
+          write(*, *)
+       endif
+
+    enddo
+
+    ! Output of the attributes
+    write(*, *) "----- Attributes -----"
+    if(natt > 0) then
+       write(*, *) '==== global attributes ===='
+       call parse_atlist(ncid, natt, nf90_global)
+       write(*, *)
+    endif
+
+  end subroutine read_grid_from_netcdf
+
+  !=============================================================================
+  subroutine parse_atlist( ncid, natt, varid )
+    use netcdf
+
+    character (len = 256) :: c1d
+    character (len = 128) :: name
+    integer(kind = 4) :: ncid, natt, varid
+    integer(kind = 4) :: xtype, len
+    integer(kind = 4) :: k, kk, status
+    real(kind = 8) :: rval
+
+    integer(kind = 4), allocatable, dimension(:) :: ivals
+    real(kind = 8), allocatable, dimension(:) :: rvals
+
+    do k = 1, natt
+       status = nf90_inq_attname(ncid, varid, k, name)
+       status = nf90_inquire_attribute(ncid, varid, name, xtype, len, kk)
+
+       if (xtype == NF90_CHAR) then
+          if (len > 256) then
+             write(*,*) 'truncating attribute to length:', 256
+          endif
+          status = nf90_get_att(ncid, varid, name, c1d )
+          if (status /= 0) stop 'error calling get_att'
+          write(*, '(a," ", a)') trim(name), trim(c1d)
+       else if ( xtype == NF90_INT ) then
+          if (len > 1) then
+             allocate( ivals(len) )
+             status = nf90_get_att(ncid, varid, name, ivals )
+             if (status /= 0) stop "error calling get_att for integer array"
+             write(*,'(a,3h:: ,(i6))') trim(name), ivals
+             deallocate( ivals )
+          else
+             status = nf90_get_att(ncid, varid, name, ivals )
+             if (status /= 0) stop 'error calling get_att for integer'
+             write(6,'(a,3h:: ,(i6))') trim(name), ivals
+          endif
+       else if( xtype == NF90_FLOAT ) then
+          if (len > 1) then
+             allocate( rvals(len) )
+             status = nf90_get_att(ncid, varid, name, rvals )
+             if (status /= 0) stop 'error calling get_att for real array'
+             write(*,'(a,3h:: ,(e12.5))') trim(name), rvals
+             deallocate( rvals )
+          else
+             status = nf90_get_att(ncid, varid, name, rval )
+             if(status /= 0) stop "error calling get_att for real"
+             write(6, '(a,3h:: ,(e12.5))') trim(name), rval
+          endif
+       else if( xtype == NF90_DOUBLE ) then
+          if (len > 1) then
+             allocate( rvals(len) )
+             status = nf90_get_att(ncid, varid, name, rvals )
+             if (status /= 0) stop "error calling get_att for real array"
+             write(*, '(a,3h:: ,(e12.5))') trim(name), rvals
+             deallocate( rvals )
+          else
+             status = nf90_get_att(ncid, varid, name, rval )
+             if(status /= 0) stop "error calling get_att for real"
+             write(6, '(a,3h:: ,(e12.5))') trim(name), rval
+          endif
+
+       endif
+    enddo
+
+  end subroutine parse_atlist
 
 END MODULE toy_ocn
 
