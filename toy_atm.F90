@@ -137,9 +137,9 @@ CONTAINS
     ! CALL yac_fset_global_index(global_cell_id, YAC_LOCATION_CELL, grid_id)
 
     ! Define location of the actual data (on cell centers)
-    CALL yac_fdef_points ( &
-         grid_id, num_cells, YAC_LOCATION_CELL, &
-         x_cells, y_cells, cell_point_id )
+    !CALL yac_fdef_points ( &
+    !     grid_id, num_cells, YAC_LOCATION_CELL, &
+    !     x_cells, y_cells, cell_point_id )
 
     !   ! Set mask for cell centers
     !   CALL yac_fset_mask(cell_sea_land_mask >= 0, cell_point_id)
