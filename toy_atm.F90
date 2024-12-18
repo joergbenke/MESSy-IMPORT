@@ -112,27 +112,21 @@ CONTAINS
 
     ! Create the numerbing of the cells (column wise; from bottom totop)
     do i = 1, num_cells
-       !if ( ((i / (num_vertices_lat - 1)) == 0) .or. (mod(i,(num_vertices_lat - 1)) == 0) ) then
        if(i < num_vertices_lat) then
           cell_to_vertex(i, 1) = 1 + (i - 1)
           cell_to_vertex(i, 2) = 2 + (i - 1) 
-          cell_to_vertex(i, 3) = (1 + num_vertices_lat) + (i - 1)      ! number + (i / num_vertices_lat) * num_vertices_lat
+          cell_to_vertex(i, 3) = (1 + num_vertices_lat) + (i - 1)
           cell_to_vertex(i, 4) = (2 + num_vertices_lat) + (i - 1)
        else
           cell_to_vertex(i, 1) = cell_to_vertex(i - (num_vertices_lat - 1), 3)
           cell_to_vertex(i, 2) = cell_to_vertex(i - (num_vertices_lat - 1), 4) 
-          cell_to_vertex(i, 3) = cell_to_vertex(i, 1) + num_vertices_lat  !6 + i ! number + (i / num_vertices_lat) * num_vertices_lat
-          cell_to_vertex(i, 4) = cell_to_vertex(i, 2) + num_vertices_lat  !7 + i
+          cell_to_vertex(i, 3) = cell_to_vertex(i, 1) + num_vertices_lat
+          cell_to_vertex(i, 4) = cell_to_vertex(i, 2) + num_vertices_lat
        end if   
        
        write(*, *) "element number: ", i, ", num_cells: ", num_cells
        write(*, *) cell_to_vertex(i, 1), cell_to_vertex(i, 2), cell_to_vertex(i, 3), cell_to_vertex(i, 4)
     end do
-
-!     write(*, *) "Size: ", size(cell_to_vertex)
-!    do i = 1, num_cells
-!      write(*, *) cell_to_vertex(i, 1), cell_to_vertex(i, 2), cell_to_vertex(i, 3), cell_to_vertex(i, 4)
-!    end do  
 
     ! Define local part of the grid
     CALL yac_fdef_grid ( &
@@ -345,18 +339,14 @@ CONTAINS
     
     ! Number of cells is product of vertices in lat and lon direction
     num_cells = num_vertices_lon * num_vertices_lat
-    write(*, *) "num_cells: ", num_cells
 
     ! Now correction to number of vertices if vertex is on a real node and not in cell center
     num_vertices_lon = num_vertices_lon + 1
     num_vertices_lat = num_vertices_lat + 1 
-    write(*, *) num_vertices_lon, num_vertices_lat
-
     num_vertices = num_vertices_lon * num_vertices_lat
-    write(*, *) "num_vertices: ", num_vertices
-    !write(*, *) 'axes ', dimids(k), dimnames(k), dimlengths(k)
 
-       ! Output of the variables
+
+    ! Output of the variables
     write(*, *)
     write(*, *) "----- Variables -----"
     do k = 1, nvar
