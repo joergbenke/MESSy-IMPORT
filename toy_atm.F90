@@ -116,8 +116,8 @@ CONTAINS
        if(i < num_vertices_lat) then
           cell_to_vertex(i, 1) = 1 + (i - 1)
           cell_to_vertex(i, 2) = 2 + (i - 1) 
-          cell_to_vertex(i, 3) = 6 + (i - 1) ! number + (i / num_vertices_lat) * num_vertices_lat
-          cell_to_vertex(i, 4) = 7 + (i - 1)
+          cell_to_vertex(i, 3) = (1 + num_vertices_lat) + (i - 1)      ! number + (i / num_vertices_lat) * num_vertices_lat
+          cell_to_vertex(i, 4) = (2 + num_vertices_lat) + (i - 1)
        else
           cell_to_vertex(i, 1) = cell_to_vertex(i - (num_vertices_lat - 1), 3)
           cell_to_vertex(i, 2) = cell_to_vertex(i - (num_vertices_lat - 1), 4) 
@@ -296,7 +296,7 @@ CONTAINS
 
     ! Open netCDF file
     status = nf90_open(trim(filename), nf90_nowrite, ncid)
-    if (status /= nf90_noerr) then
+    if(status /= nf90_noerr) then
        write(*, *) 'could not open::', filename
        write(*, *) status
        stop 'parse_nc [1]'
