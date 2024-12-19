@@ -19,7 +19,7 @@ ICON_GRIDS = \
     grids/icon_grid_0043_R02B04_G.nc
 TEST_DATA_URL = http://icon-downloads.mpimet.mpg.de/grids/public/mpim
 
-TOYS = toy_atm.x toy_ocn.x toy_spmd.x
+TOYS = toy_atm.x toy_ocn.x
 
 all: $(TOYS) grid_files
 
@@ -36,19 +36,15 @@ grids:
 
 toy_atm.mod: toy_common.mod
 toy_ocn.mod: toy_common.mod
-toy_spmd.mod: toy_atm.mod toy_ocn.mod
 
 %.mod: %.F90
 	$(MAKEMOD) $(FCLAGS) $*.F90
-
-toy_spmd.o: toy_atm.mod toy_ocn.mod
 
 %.o: %.mod %.F90
 	$(F90) $(FCLAGS) -c $*.F90
 
 toy_atm.x: toy_common.o
 toy_ocn.x: toy_common.o
-toy_spmd.x: toy_spmd.o toy_atm.o toy_ocn.o toy_common.o
 
 %.x: %.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
