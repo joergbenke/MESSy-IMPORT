@@ -39,15 +39,14 @@ MODULE toy_atm
   INTEGER :: field_oceanv_id
   INTEGER :: field_iceoce_id
   integer(kind = 4) :: i, j
-  
+
   ! Basic decomposed grid information
   INTEGER(kind = 4)             :: num_vertices_lon, num_vertices_lat
   INTEGER(kind = 4)             :: num_vertices, num_cells, num_vertices_per_cell
   INTEGER, ALLOCATABLE          :: cell_to_vertex(:,:)
-  DOUBLE PRECISION, ALLOCATABLE :: x_vertices(:)
-  DOUBLE PRECISION, ALLOCATABLE :: y_vertices(:)
-  DOUBLE PRECISION, ALLOCATABLE :: x_cells(:)
-  DOUBLE PRECISION, ALLOCATABLE :: y_cells(:)
+  DOUBLE PRECISION, ALLOCATABLE :: x_vertices(:), y_vertices(:)
+  DOUBLE PRECISION, ALLOCATABLE :: x_vertices_orig(:), y_vertices_orig(:)
+  DOUBLE PRECISION, ALLOCATABLE :: x_cells(:), y_cells(:)
   INTEGER, ALLOCATABLE          :: cell_sea_land_mask(:)
   INTEGER, ALLOCATABLE          :: global_cell_id(:)
 
@@ -64,7 +63,7 @@ CONTAINS
     INTEGER, INTENT(IN)   :: comm
     character(len = 200)  :: file = 'grids/GEIA_MPIC1.0_X_bioland_NH3_2000-2000.nc' 
     character(len = 5000) :: grid_metadata
-    
+
     comp_comm = comm
 
 
@@ -98,15 +97,16 @@ CONTAINS
     num_vertices = num_vertices_lon * num_vertices_lat
     allocate(x_vertices(num_vertices_lon))
     allocate(y_vertices(num_vertices_lat))
-    
+
+    ! Correction of the values (simple case)
     do i = 1, num_vertices_lon
        x_vertices(i) = -180.0 + (i - 1) * 1.0
     end do
-    
+
     do i = 1, num_vertices_lat
        y_vertices(i) = -90.0 + (i - 1) * 1.0
     end do
-    
+
     write(*, *) x_vertices
     write(*, *) y_vertices
 
@@ -126,19 +126,19 @@ CONTAINS
           cell_to_vertex(i, 2) = cell_to_vertex(i - (num_vertices_lat - 1), 4) 
           cell_to_vertex(i, 3) = cell_to_vertex(i, 1) + num_vertices_lat
           cell_to_vertex(i, 4) = cell_to_vertex(i, 2) + num_vertices_lat
-       end if   
-       
+       end if
+
        write(*, *) "element number: ", i, ", num_cells: ", num_cells
        write(*, *) cell_to_vertex(i, 1), cell_to_vertex(i, 2), cell_to_vertex(i, 3), cell_to_vertex(i, 4)
     end do
 
     ! Define local part of the grid
     CALL yac_fdef_grid ( &
-        grid_name, num_vertices, num_cells, num_vertices_per_cell, &
-        x_vertices, y_vertices, cell_to_vertex, grid_id )
+         grid_name, num_vertices, num_cells, num_vertices_per_cell, &
+         x_vertices, y_vertices, cell_to_vertex, grid_id )
 
-!    grid_metadata = "hello grid"
-!    CALL yac_fdef_grid_metadata(grid_name, grid_metadata) 
+    !    grid_metadata = "hello grid"
+    !    CALL yac_fdef_grid_metadata(grid_name, grid_metadata) 
 
     ! Set global cell ids
     ! CALL yac_fset_global_index(global_cell_id, YAC_LOCATION_CELL, grid_id)
@@ -175,10 +175,10 @@ CONTAINS
     END DO ! time loop
 
     deallocate(cell_to_vertex)
-    
+
   END SUBROUTINE main_atm
 
-  
+
   SUBROUTINE init_fields()
 
     ! Allocate output field buffers
@@ -287,14 +287,15 @@ CONTAINS
     character(len = 200), allocatable, dimension(:) :: dimnames, varnames
     character(len = 1000) :: attr_grid
     character(len = 5000) :: attr_grid_total
-    
+
     integer :: ncid, status, xtype, ndim, nvar, natt, natts
     integer :: len, k, ndims, l1, l2, l3, k_un
     integer(kind = 4), intent(out) :: num_vertices_lon, num_vertices_lat, num_cells
     integer, allocatable, dimension(:) :: dimids, varids, vardims, vardatatype, varnatts, vardimids
 
     real, allocatable, dimension(:,:,:) :: data
-
+    real(kind = 8), allocatable, dimension(:) :: lon_array, lat_array
+    
     ! Open netCDF file
     write(*, *)
     write(*, *) "----- Open netCDF file -----"
@@ -341,8 +342,9 @@ CONTAINS
        end if
 
     enddo
-    
-    ! Number of cells is product of vertices in lat and lon direction
+
+    ! Number of cells is product of vertices in lat and lon direction because
+    ! usually the coordinates are centered in an element
     num_cells = num_vertices_lon * num_vertices_lat
 
     ! Now correction to number of vertices if vertex is on a real node and not in cell center
@@ -374,15 +376,16 @@ CONTAINS
 
        if(index(varnames(k), 'lon') /= 0) then
           write(*, *) "lon found"
+          allocate(lon_array(vardims(k) + 1))
 
           if(natts > 0) then
-          write(* ,*) '==== data attributes ===='
-          call parse_attr_list(ncid, natts, k, attr_grid)
-          attr_grid_total = attr_grid_total // attr_grid
-          write(*, *)
-       endif
+             write(* ,*) '==== data attributes ===='
+             call parse_attr_list(ncid, natts, k, attr_grid)
+             attr_grid_total = attr_grid_total // attr_grid
+             write(*, *)
+          endif
 
-!       attr_grid = attr_grid +  
+          !       attr_grid = attr_grid +  
           !        l1 = dimlengths(dimids(1))
           !        l2 = dimlengths(dimids(2))
           !        l3 = dimlengths(dimids(3))
@@ -392,14 +395,16 @@ CONTAINS
 
        if(index(varnames(k), 'lat') /= 0) then
           write(*, *) "lat found"
-          if(natts > 0) then
-          write(* ,*) '==== data attributes ===='
-          call parse_attr_list(ncid, natts, k, attr_grid)
-          attr_grid_total = attr_grid_total // attr_grid
-          write(*, *) "attr_grid lat: ", trim(attr_grid)
-       endif
+          allocate(lat_array(vardims(k) + 1))
 
-!       attr_grid = attr_grid +  
+          if(natts > 0) then
+             write(* ,*) '==== data attributes ===='
+             call parse_attr_list(ncid, natts, k, attr_grid)
+             attr_grid_total = attr_grid_total // attr_grid
+             write(*, *) "attr_grid lat: ", trim(attr_grid)
+          endif
+
+          !       attr_grid = attr_grid +  
        end if
 
        if(natts > 0) then
@@ -429,11 +434,11 @@ CONTAINS
     character(len = 256) :: c1d
     character(len = 128) :: name
     character(len = 1000), intent(inout) :: attr_grid
-    
+
     integer(kind = 4) :: ncid, n_attr_loc, varid
     integer(kind = 4) :: xtype, len, status
     integer(kind = 4) :: k, kk
-    
+
     real(kind = 8) :: rval
 
     integer(kind = 4), allocatable, dimension(:) :: ivals
@@ -494,7 +499,6 @@ CONTAINS
   end subroutine parse_attr_list
 
 END MODULE toy_atm
-
 
 PROGRAM main_atm_program
   USE mpi

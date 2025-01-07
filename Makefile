@@ -4,7 +4,7 @@
 
 F90 = mpif90
 LD = mpif90
-FCLAGS = -Wall -Wpedantic -Wextra -O0 -g $(shell pkg-config yac-mci --cflags) -I/sw/spack-levante/netcdf-fortran-4.5.3-jlxcfz/include
+FCLAGS = -Wall -Wpedantic -Wextra -fbounds-check -O0 -g $(shell pkg-config yac-mci --cflags) -I/sw/spack-levante/netcdf-fortran-4.5.3-jlxcfz/include
 LDFLAGS = $(FCLAGS) -Wl,--allow-multiple-definition
 LIBS = $(shell pkg-config yac-utils --libs) \
        $(shell pkg-config yac-mci --libs) -L/sw/spack-levante/netcdf-fortran-4.5.3-jlxcfz/lib -lnetcdff
