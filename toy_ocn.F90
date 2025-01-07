@@ -29,17 +29,14 @@ MODULE toy_ocn
   INTEGER :: comp_rank
   INTEGER :: grid_id
   INTEGER :: cell_point_id
-  INTEGER :: field_taux_id
-  INTEGER :: field_tauy_id
+  INTEGER :: field_taux_id, field_tauy_id
   INTEGER :: field_sfwflx_id
   INTEGER :: field_sftemp_id
   INTEGER :: field_thflx_id
-  INTEGER :: field_iceatm_id
+  INTEGER :: field_iceatm_id, field_iceoce_id
   INTEGER :: field_sst_id
-  INTEGER :: field_oceanu_id
-  INTEGER :: field_oceanv_id
-  INTEGER :: field_iceoce_id
-  integer :: i, j
+  INTEGER :: field_oceanu_id, field_oceanv_id
+  integer :: i
   
   ! Basic decomposed grid information
   INTEGER(kind = 4)             :: num_vertices_lon, num_vertices_lat
@@ -274,19 +271,20 @@ CONTAINS
     use netcdf
     implicit none
 
-    character(len = 200) :: filename, name
-    character(len = 200), allocatable, dimension(:) :: dimnames, varnames
+    character(len = *) :: filename
+    character(len = 200) :: name
+    character(len = 200), allocatable, dimension(:) :: varnames
 
     integer :: status, xtype, ncid, ndim, nvar, natt, natts
-    integer :: len, k, ndims, l1, l2, l3, k_un
+    integer :: len, k, ndims, k_un
     integer(kind = 4), intent(out) :: num_vertices_lon, num_vertices_lat, num_vertices
     integer(kind = 4), intent(out) :: num_cells
-    integer, allocatable, dimension(:) :: dimids, dimlengths
-    integer, allocatable, dimension(:) :: varids, vardims, vardatatype, varnatts, vardimids
-
-    real, allocatable, dimension(:,:,:) :: data
+    integer(kind = 4), allocatable, dimension(:) :: dimids
+    integer(kind = 4), allocatable, dimension(:) :: varids, vardims, vardatatype, varnatts, vardimids
 
     ! Open netCDF file
+    write(*, *)
+    write(*, *) "----- Open netCDF file -----"
     status = nf90_open(trim(filename), nf90_nowrite, ncid)
     if (status /= nf90_noerr) then
        write(*, *) 'could not open::', filename
@@ -306,7 +304,6 @@ CONTAINS
     write(*, *) 'ndim, nvar, natt, k_un:', ndim, nvar, natt, k_un
 
     ! Output of the dimensions
-    allocate(dimids(ndim), dimlengths(ndim), dimnames(ndim))
     allocate(varids(nvar), vardims(nvar), vardatatype(nvar), varnames(nvar), varnatts(nvar), vardimids(nvar))
 
     write(*, *)
@@ -319,20 +316,15 @@ CONTAINS
           stop 'parse_nc [1]'
        endif
 
-       dimids(k) = k
-       dimlengths(k) = len
-       dimnames(k) = trim(name)
-
        ! read number vertices in longitude directions (vertex is midpoint of cell)
-       if(index(dimnames(k), 'lon') /= 0) then
-          num_vertices_lon = dimlengths(k) 
+       if(index(trim(name), 'lon') /= 0) then
+          num_vertices_lon = len 
        end if
 
        ! read number vertices in lattitude directions (vertex is midpoint of cell)
-       if(index(dimnames(k), 'lat') /= 0) then
-          num_vertices_lat = dimlengths(k) 
+       if(index(trim(name), 'lat') /= 0) then
+          num_vertices_lat = len
        end if
-
     enddo
     
     ! Number of cells is product of vertices in lat and lon direction

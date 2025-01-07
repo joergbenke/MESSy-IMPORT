@@ -28,27 +28,23 @@ MODULE toy_atm
   INTEGER :: comp_comm
   INTEGER :: grid_id
   INTEGER :: cell_point_id
-  INTEGER :: field_taux_id
-  INTEGER :: field_tauy_id
+  INTEGER :: field_taux_id, field_tauy_id
   INTEGER :: field_sfwflx_id
   INTEGER :: field_sftemp_id
   INTEGER :: field_thflx_id
-  INTEGER :: field_iceatm_id
+  INTEGER :: field_iceatm_id, field_iceoce_id
   INTEGER :: field_sst_id
-  INTEGER :: field_oceanu_id
-  INTEGER :: field_oceanv_id
-  INTEGER :: field_iceoce_id
-  integer(kind = 4) :: i, j
+  INTEGER :: field_oceanu_id, field_oceanv_id
+  integer(kind = 4) :: i
 
   ! Basic decomposed grid information
   INTEGER(kind = 4)             :: num_vertices_lon, num_vertices_lat
   INTEGER(kind = 4)             :: num_vertices, num_cells, num_vertices_per_cell
   INTEGER, ALLOCATABLE          :: cell_to_vertex(:,:)
   DOUBLE PRECISION, ALLOCATABLE :: x_vertices(:), y_vertices(:)
-  DOUBLE PRECISION, ALLOCATABLE :: x_vertices_orig(:), y_vertices_orig(:)
-  DOUBLE PRECISION, ALLOCATABLE :: x_cells(:), y_cells(:)
-  INTEGER, ALLOCATABLE          :: cell_sea_land_mask(:)
-  INTEGER, ALLOCATABLE          :: global_cell_id(:)
+!  DOUBLE PRECISION, ALLOCATABLE :: x_cells(:), y_cells(:)
+!  INTEGER, ALLOCATABLE          :: cell_sea_land_mask(:)
+!  INTEGER, ALLOCATABLE          :: global_cell_id(:)
 
   ! Buffer for field data
   DOUBLE PRECISION, DIMENSION(:,:), ALLOCATABLE :: &
@@ -87,28 +83,10 @@ CONTAINS
     !    num_cells = SIZE(x_cells)
     !    num_vertices_per_cell = SIZE(cell_to_vertex, 1)
 
-    call read_grid_from_netcdf(trim(file), num_vertices_lon, num_vertices_lat, num_cells)
+    call read_grid_from_netcdf(trim(file), num_vertices_lon, num_vertices_lat, num_cells, x_vertices, y_vertices)
     num_vertices_per_cell = 4
     write(*, *) "Values"
     write(*, *) num_vertices_lon, num_vertices_lat, num_vertices, num_cells, num_vertices_per_cell
-
-    ! Allocate and fill the vertex arrays (for longitude and lattitude
-
-    num_vertices = num_vertices_lon * num_vertices_lat
-    allocate(x_vertices(num_vertices_lon))
-    allocate(y_vertices(num_vertices_lat))
-
-    ! Correction of the values (simple case)
-    do i = 1, num_vertices_lon
-       x_vertices(i) = -180.0 + (i - 1) * 1.0
-    end do
-
-    do i = 1, num_vertices_lat
-       y_vertices(i) = -90.0 + (i - 1) * 1.0
-    end do
-
-    write(*, *) x_vertices
-    write(*, *) y_vertices
 
     ! Allocate and fill the arry cell_to_vertex with the vertices of the elements
     allocate(cell_to_vertex(num_cells, 4))
@@ -279,22 +257,23 @@ CONTAINS
 
 
   ! ===================== subroutine read_grid_from_netcdf =========================
-  subroutine read_grid_from_netcdf(filename, num_vertices_lon, num_vertices_lat, num_cells)
+  subroutine read_grid_from_netcdf(filename, num_vertices_lon, num_vertices_lat, num_cells, x_vertices, y_vertices)
     use netcdf
     implicit none
 
-    character(len = 200) :: filename, name
-    character(len = 200), allocatable, dimension(:) :: dimnames, varnames
+    character(len = *) :: filename
+    character(len = 200) :: name
+    character(len = 200), allocatable, dimension(:) :: varnames
     character(len = 1000) :: attr_grid
     character(len = 5000) :: attr_grid_total
 
     integer :: ncid, status, xtype, ndim, nvar, natt, natts
-    integer :: len, k, ndims, l1, l2, l3, k_un
+    integer :: len, k, ndims, k_un
     integer(kind = 4), intent(out) :: num_vertices_lon, num_vertices_lat, num_cells
     integer, allocatable, dimension(:) :: dimids, varids, vardims, vardatatype, varnatts, vardimids
 
-    real, allocatable, dimension(:,:,:) :: data
     real(kind = 8), allocatable, dimension(:) :: lon_array, lat_array
+    real(kind = 8), allocatable, dimension(:) :: x_vertices, y_vertices
     
     ! Open netCDF file
     write(*, *)
@@ -340,7 +319,6 @@ CONTAINS
        if(index(trim(name), 'lat') /= 0) then
           num_vertices_lat = len
        end if
-
     enddo
 
     ! Number of cells is product of vertices in lat and lon direction because
@@ -416,6 +394,25 @@ CONTAINS
     enddo
 
 
+! Allocate and fill the vertex arrays (for longitude and lattitude
+    num_vertices = num_vertices_lon * num_vertices_lat
+    allocate(x_vertices(num_vertices_lon))
+    allocate(y_vertices(num_vertices_lat))
+
+    ! Correction of the values (simple case)
+    do i = 1, num_vertices_lon
+       x_vertices(i) = -180.0 + (i - 1) * 1.0
+    end do
+
+    do i = 1, num_vertices_lat
+       y_vertices(i) = -90.0 + (i - 1) * 1.0
+    end do
+
+    write(*, *) x_vertices
+    write(*, *) y_vertices
+
+
+    
     write(*, *) "attr_grid = ", attr_grid
     ! Output of the attributes
     write(*, *) "----- Attributes -----"
