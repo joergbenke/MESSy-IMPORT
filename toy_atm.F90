@@ -263,17 +263,17 @@ CONTAINS
 
     character(len = *) :: filename
     character(len = 200) :: name
-    character(len = 200), allocatable, dimension(:) :: varnames
     character(len = 1000) :: attr_grid
     character(len = 5000) :: attr_grid_total
 
     integer :: ncid, status, xtype, ndim, nvar, natt, natts
     integer :: len, k, ndims, k_un
     integer(kind = 4), intent(out) :: num_vertices_lon, num_vertices_lat, num_cells
-    integer, allocatable, dimension(:) :: dimids, varids, vardims, vardatatype, varnatts, vardimids
+    integer, allocatable, dimension(:) :: dimids, vardatatype, varnatts, vardimids
 
     real(kind = 8), allocatable, dimension(:) :: lon_array, lat_array
     real(kind = 8), allocatable, dimension(:) :: x_vertices, y_vertices
+    real(kind = 8), allocatable, dimension(:) :: x_vertices_orig(:), y_vertices_orig(:)
     
     ! Open netCDF file
     write(*, *)
@@ -298,7 +298,7 @@ CONTAINS
 
     ! Output of the dimensions
     allocate(dimids(ndim))
-    allocate(varids(nvar), vardims(nvar), vardatatype(nvar), varnames(nvar), varnatts(nvar), vardimids(nvar))
+    allocate(vardatatype(nvar), varnatts(nvar), vardimids(nvar))
 
     write(*, *)
     write(*, *) "----- Output of dimensions id, length and name -----"
@@ -320,6 +320,8 @@ CONTAINS
           num_vertices_lat = len
        end if
     enddo
+    allocate(x_vertices_orig(num_vertices_lon))
+    allocate(y_vertices_orig(num_vertices_lat))
 
     ! Number of cells is product of vertices in lat and lon direction because
     ! usually the coordinates are centered in an element
@@ -343,18 +345,33 @@ CONTAINS
           stop 'parse_nc [1]'
        endif
 
-       varids(k) = k
-       varnames(k) = trim(name)
        vardatatype(k) = xtype
-       vardims(k) = ndims
        varnatts(k) = natts
 
-       write(*,'(a,I3,a,a,a,I3,a,I3,a,I3)') "variable id", varids(k), ", varname: ", trim(varnames(k)), ", vardatatype: ", &
-            vardatatype(k), ", vardim: ", vardims(k), ", variable number of attributes: ", varnatts(k)
+       write(*,'(a,I3,a,a,a,I3,a,I3,a,I3)') "variable id: ", k, " varname: ", trim(name), ", vardatatype: ", &
+            vardatatype(k), ", vardim: ", ndims, ", variable number of attributes: ", varnatts(k)
 
-       if(index(varnames(k), 'lon') /= 0) then
+       if(index(trim(name), 'lon') /= 0) then
           write(*, *) "lon found"
-          allocate(lon_array(vardims(k) + 1))
+          allocate(x_vertices(num_vertices_lon))
+          write(*, *) "shape: ", shape(x_vertices)
+          
+          status = nf90_get_var( ncid, k, x_vertices_orig ) !(/ 1,1,1 /) )
+          if (status /= nf90_noerr) then
+             write(*, *) "***** n90_get_var error *****"
+             write(*, *) "***** status *****", status
+             stop 'parse_nc [1]'
+          endif
+
+          write(*, *) "x_vertices_orig"
+          write(*, *) x_vertices_orig
+          write(*, *)
+
+          ! Correction
+          do i = 1, num_vertices_lon - 1
+             x_vertices(i) = x_vertices_orig(i) - 0.5
+          end do
+          x_vertices(num_vertices_lon) = 180.0
 
           if(natts > 0) then
              write(* ,*) '==== data attributes ===='
@@ -371,9 +388,9 @@ CONTAINS
           !        status = nf90_get_var( ncid, k, data, (/ 1,1,1 /) )
        end if
 
-       if(index(varnames(k), 'lat') /= 0) then
+       if(index(trim(name), 'lat') /= 0) then
           write(*, *) "lat found"
-          allocate(lat_array(vardims(k) + 1))
+          allocate(lat_array(num_vertices_lat + 1))
 
           if(natts > 0) then
              write(* ,*) '==== data attributes ===='
@@ -396,13 +413,13 @@ CONTAINS
 
 ! Allocate and fill the vertex arrays (for longitude and lattitude
     num_vertices = num_vertices_lon * num_vertices_lat
-    allocate(x_vertices(num_vertices_lon))
+!    allocate(x_vertices(num_vertices_lon))
     allocate(y_vertices(num_vertices_lat))
 
     ! Correction of the values (simple case)
-    do i = 1, num_vertices_lon
-       x_vertices(i) = -180.0 + (i - 1) * 1.0
-    end do
+ !   do i = 1, num_vertices_lon
+  !     x_vertices(i) = -180.0 + (i - 1) * 1.0
+   ! end do
 
     do i = 1, num_vertices_lat
        y_vertices(i) = -90.0 + (i - 1) * 1.0
