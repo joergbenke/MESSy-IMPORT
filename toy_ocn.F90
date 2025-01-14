@@ -18,7 +18,7 @@ MODULE toy_ocn
 
   ! Basic string paramters
   CHARACTER(LEN=max_char_length), PARAMETER :: yaml_filename = "input/coupling.yaml"
-  CHARACTER(LEN=max_char_length), PARAMETER :: grid_filename = "grids/icon_grid_0036_R02B04_O.nc"
+  CHARACTER(LEN=max_char_length), PARAMETER :: grid_filename = "grids/GEIA_MPIC1.0_X_bioland_NH3_2000-2000.nc"
   CHARACTER(LEN=max_char_length), PARAMETER :: comp_name = "ocn_comp"
   CHARACTER(LEN=max_char_length), PARAMETER :: grid_name = "ocn_grid"
 
@@ -58,7 +58,7 @@ CONTAINS
   SUBROUTINE main_ocn(comm)
 
     INTEGER, INTENT(IN) :: comm
-    character(len = 200) :: file = 'grids/GEIA_MPIC1.0_X_bioland_NH3_2000-2000.nc' 
+    integer, dimension(2) :: cyclic = (/1, 0 /)
     character(len = 5000) :: grid_metadata
 
     comp_comm = comm
@@ -83,7 +83,8 @@ CONTAINS
 !    num_vertices_per_cell = SIZE(cell_to_vertex, 1)
 
     ! Define local part of the grid
-    call read_grid_from_netcdf(trim(file), num_vertices_lon, num_vertices_lat, num_cells, x_vertices, y_vertices)
+    call read_grid_from_netcdf(trim(grid_filename), num_vertices_lon, num_vertices_lat, num_cells, &
+         x_vertices, y_vertices, x_cells, y_cells)
     num_vertices_per_cell = 4
     write(*, *) "OCN: Values grid: ", num_vertices_lon, num_vertices_lat, num_vertices, num_cells, num_vertices_per_cell
 
@@ -112,17 +113,37 @@ CONTAINS
     ! Define the grid for YAC
     write(*, *)
     write(*, *) "OCN: Before YAC_FDEF_GRID"
-    CALL yac_fdef_grid ( &
-         grid_name, num_vertices, num_cells, num_vertices_per_cell, &
-         x_vertices, y_vertices, cell_to_vertex, grid_id )
+
+    cyclic = (/ 1,0/)
+    CALL yac_fdef_grid( &
+         grid_name, (/ num_vertices_lon, num_vertices_lat /), cyclic, &
+         x_vertices, y_vertices, grid_id )
+    ! Interface for yac_fdef_grid_reg2d_dble 
+
+    !  CALL yac_fdef_grid ( &
+!         grid_name, num_vertices, num_cells, num_vertices_per_cell, &
+!         x_vertices, y_vertices, cell_to_vertex, grid_id )
     write(*, *) "OCN: After YAC_FDEF_GRID"
     write(*, *)
     
     ! Define location of the actual data (on cell centers)
+    write(*, *)
+    write(*, *) "OCN: Before YAC_FDEF_POINTS"
+
+    write(*, *) "num_vertices_lon, num_vertices_lat", num_vertices_lon, num_vertices_lat
+    write(*, *) "size x_cells, y_cells", size(x_vertices), size(y_vertices)
+    CALL yac_fdef_points ( &
+         grid_id, (/ num_vertices_lon, num_vertices_lat /), YAC_LOCATION_CORNER, &
+         x_vertices, y_vertices, cell_point_id )
+
+!    write(*, *) "num_vertices_lon-1, num_vertices_lat-1", num_vertices_lon-1, num_vertices_lat-1
+!    write(*, *) "size x_cells, y_cells", size(x_cells), size(y_cells)
 !    CALL yac_fdef_points ( &
-!         grid_id, num_cells, YAC_LOCATION_CELL, &
+!         grid_id, (/ num_vertices_lon-1, num_vertices_lat-1 /), YAC_LOCATION_CELL, &
 !         x_cells, y_cells, cell_point_id )
-!         x_coords_orig, y_coords_orig, cell_point_id )
+
+    write(*, *)
+    write(*, *) "OCN: After YAC_FDEF_POINTS"
 
     ! Set global cell ids
     ! CALL yac_fset_global_index(global_cell_id, YAC_LOCATION_CELL, grid_id)
@@ -259,7 +280,8 @@ CONTAINS
 
 
     ! ===================== subroutine readgrid_from_netcdf =========================
-  subroutine read_grid_from_netcdf(filename, num_vertices_lon, num_vertices_lat, num_cells, x_vertices, y_vertices)
+  subroutine read_grid_from_netcdf(filename, num_vertices_lon, num_vertices_lat, num_cells, &
+       x_vertices, y_vertices, x_cells, y_cells)
     use netcdf
     implicit none
 
@@ -274,7 +296,7 @@ CONTAINS
     integer, allocatable, dimension(:) :: dimids
 
     real(kind = 8), allocatable, dimension(:) :: x_vertices, y_vertices
-    real(kind = 8), allocatable, dimension(:) :: x_vertices_orig, y_vertices_orig
+    real(kind = 8), allocatable, dimension(:) :: x_cells, y_cells
     
     ! Open netCDF file
     write(*, *)
@@ -324,8 +346,8 @@ CONTAINS
     enddo
     write(*, *) "OCN: lon = ", num_vertices_lon, " lat = ", num_vertices_lat
 
-    allocate(x_vertices_orig(num_vertices_lon))
-    allocate(y_vertices_orig(num_vertices_lat))
+    allocate(x_cells(num_vertices_lon))
+    allocate(y_cells(num_vertices_lat))
 
     ! Number of cells is product of vertices in lat and lon direction because
     ! usually the coordinates are centered in an element
@@ -359,20 +381,20 @@ CONTAINS
           allocate(x_vertices(num_vertices_lon))
           write(*, *) "OCN: shape: ", shape(x_vertices)
           
-          status = nf90_get_var( ncid, k, x_vertices_orig ) !(/ 1,1,1 /) )
+          status = nf90_get_var( ncid, k, x_cells ) !(/ 1,1,1 /) )
           if (status /= nf90_noerr) then
              !write(*, *) "***** n90_get_var error *****"
              !write(*, *) "status", status
              stop 
           endif
 
-          !write(*, *) "x_vertices_orig (ocean)"
-          !write(*, *) x_vertices_orig
+          !write(*, *) "x_cells (ocean)"
+          !write(*, *) x_cells
           !write(*, *)
 
           ! Correction
           do i = 1, num_vertices_lon - 1
-             x_vertices(i) = x_vertices_orig(i) - 0.5
+             x_vertices(i) = x_cells(i) - 0.5
           end do
           x_vertices(num_vertices_lon) = 180.0
           !write(*, *) "x_vertices (ocean)"
@@ -392,19 +414,19 @@ CONTAINS
           allocate(y_vertices(num_vertices_lat))
           write(*, *) "OCN: shape: ", shape(y_vertices)
 
-          status = nf90_get_var( ncid, k, y_vertices_orig ) 
+          status = nf90_get_var( ncid, k, y_cells ) 
           if (status /= nf90_noerr) then
              !write(*, *) "OCN: ***** n90_get_var error (ocean) *****"
              !write(*, *) "OCN: status: ", status
              stop 
           endif
 
-!          write(*, *) "y_vertices_orig"
-!          write(*, *) y_vertices_orig
+!          write(*, *) "y_cells"
+!          write(*, *) y_cells
 !          write(*, *)
 
           do i = 1, num_vertices_lat - 1
-             y_vertices(i) = y_vertices_orig(i) - 0.5
+             y_vertices(i) = y_cells(i) - 0.5
           end do
           y_vertices(num_vertices_lat) = 90.0
 
