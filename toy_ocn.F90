@@ -186,9 +186,10 @@ CONTAINS
       iceoce(num_cells, 5))
 
     ! Initialise output field buffer with dummy data
-    DO i = 1, num_cells
-      sst(i,1) = yac_test_gulfstream_c(x_cells(i), y_cells(i))
-    END DO
+!    DO i = 1, num_cells
+!      sst(i,1) = yac_test_gulfstream_c(x_cells(i), y_cells(i))
+!    END DO
+    sst(:, 1) = 0.0d0
     oceanu(:,1) = 120.0d0
     oceanv(:,1) = 130.0d0
     iceoce(:,1) = 140.1d0
