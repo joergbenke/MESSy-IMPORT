@@ -17,7 +17,7 @@ MODULE toy_atm
 
   ! Basic string paramters
   CHARACTER(LEN=max_char_length), PARAMETER :: yaml_filename = "input/coupling.yaml"
-  CHARACTER(LEN=max_char_length), PARAMETER :: grid_filename = "grids/icon_grid_0030_R02B03_G.n"
+  CHARACTER(LEN=max_char_length), PARAMETER :: grid_filename = "grids/GEIA_MPIC1.0_X_bioland_NH3_2000-2000.nc" !
   CHARACTER(LEN=max_char_length), PARAMETER :: comp_name = "atm_comp"
   CHARACTER(LEN=max_char_length), PARAMETER :: grid_name = "atm_grid"
 
@@ -40,6 +40,7 @@ MODULE toy_atm
   INTEGER(kind = 4)             :: num_cells, num_vertices_per_cell
   
   INTEGER, ALLOCATABLE          :: cell_to_vertex(:,:)
+
   DOUBLE PRECISION, ALLOCATABLE :: x_vertices(:), y_vertices(:)
   DOUBLE PRECISION, ALLOCATABLE :: x_cells(:), y_cells(:)
 
@@ -57,7 +58,6 @@ CONTAINS
   SUBROUTINE main_atm(comm)
 
     INTEGER, INTENT(IN)   :: comm
-    character(len = 200)  :: file = 'grids/GEIA_MPIC1.0_X_bioland_NH3_2000-2000.nc' 
     character(len = 5000) :: grid_metadata
 
     comp_comm = comm
@@ -82,7 +82,7 @@ CONTAINS
     !    num_cells = SIZE(x_cells)
     !    num_vertices_per_cell = SIZE(cell_to_vertex, 1)
 
-    call read_grid_from_netcdf(trim(file), num_vertices_lon, num_vertices_lat, num_cells, x_vertices, y_vertices)
+    call read_grid_from_netcdf(trim(grid_filename), num_vertices_lon, num_vertices_lat, num_cells, x_vertices, y_vertices)
     num_vertices_per_cell = 4
     write(*, *) "ATM: Values grid: ", num_vertices_lon, num_vertices_lat, num_vertices, num_cells, num_vertices_per_cell
 
