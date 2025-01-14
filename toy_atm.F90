@@ -187,8 +187,8 @@ CONTAINS
 
     ! Allocate output field buffers
     ALLOCATE( &
-         taux(num_cells, 2), tauy(num_cells, 2), sfwflx(num_cells, 3), &
-         sftemp(num_cells, 1), thflx(num_cells, 4), iceatm(num_cells, 4))
+         taux(num_vertices, 2), tauy(num_vertices, 2), sfwflx(num_vertices, 3), &
+         sftemp(num_vertices, 1), thflx(num_vertices, 4), iceatm(num_vertices, 4))
 
     ! Initialise output field buffer with dummy data
     taux(:,1) = 10.1d0
@@ -210,8 +210,8 @@ CONTAINS
 
     ! Allocate input field buffers
     ALLOCATE( &
-         sst(num_cells, 1), oceanu(num_cells, 1), oceanv(num_cells, 1), &
-         iceoce(num_cells, 5))
+         sst(num_vertices, 1), oceanu(num_vertices, 1), oceanv(num_vertices, 1), &
+         iceoce(num_vertices, 5))
 
     ! Initialise input field buffer with zero
     sst(:,1) = 0.0d0
