@@ -364,8 +364,9 @@ CONTAINS
     ! Output of the variables
     write(*, *)
     write(*, *) "OCN: ----- Variables -----"
-    attr_grid = ""
     do k = 1, nvar
+       attr_grid = ""
+       attr_grid_total = ''
        name = ''
        status = nf90_inquire_variable(ncid, k, name, xtype, ndims, dimids, natts)
        if (status /= nf90_noerr) then
@@ -382,7 +383,7 @@ CONTAINS
           allocate(x_vertices(num_vertices_lon))
           write(*, *) "OCN: shape: ", shape(x_vertices)
           
-          status = nf90_get_var( ncid, k, x_cells ) !(/ 1,1,1 /) )
+          status = nf90_get_var( ncid, k, x_cells ) 
           if (status /= nf90_noerr) then
              !write(*, *) "***** n90_get_var error *****"
              !write(*, *) "status", status
@@ -404,8 +405,9 @@ CONTAINS
 
           if(natts > 0) then
              write(* ,*) 'OCN: ==== data attributes ===='
-             call parse_attr_list(ncid, natts, k, attr_grid)
-             attr_grid_total = attr_grid_total // attr_grid
+             call parse_attr_list(ncid, natts, k, attr_grid, attr_grid_total)
+             write(*, *)
+             write(*, *) "OCN: attr_grid_total (lon): ", trim(attr_grid_total)
              write(*, *)
           endif
        end if
@@ -437,9 +439,10 @@ CONTAINS
 
           if(natts > 0) then
              write(* ,*) 'OCN: ==== data attributes ===='
-             call parse_attr_list(ncid, natts, k, attr_grid)
-             attr_grid_total = attr_grid_total // attr_grid
-             write(*, *) "OCN: attr_grid lat: ", trim(attr_grid)
+             call parse_attr_list(ncid, natts, k, attr_grid, attr_grid_total)
+             write(*, *)
+             write(*, *) "OCN: attr_grid_total (lat): ", trim(attr_grid_total)
+             write(*, *)
           endif
        end if
     enddo
@@ -453,19 +456,22 @@ CONTAINS
     !write(*, *) "----- Attributes -----"
     if(natt > 0) then
        !write(*, *) '==== global attributes ===='
-       call parse_attr_list(ncid, natt, nf90_global, attr_grid)
-       !write(*, *)
-    endif
+       call parse_attr_list(ncid, natt, nf90_global, attr_grid, attr_grid_total)
+       write(*, *)
+       write(*, *) "OCN: attr_grid_total (global): ", trim(attr_grid_total)
+       write(*, *)
+     endif
 
   end subroutine read_grid_from_netcdf
 
   !=============================================================================
-  subroutine parse_attr_list( ncid, n_attr_loc, varid, attr_grid )
+  subroutine parse_attr_list( ncid, n_attr_loc, varid, name, attr_grid )
     use netcdf
 
     character(len = 256) :: c1d
     character(len = 128) :: name
     character(len = 1000), intent(inout) :: attr_grid
+    character(len = 2000) :: attr_grid_total
 
     integer(kind = 4) :: ncid, n_attr_loc, varid
     integer(kind = 4) :: xtype, len, status
@@ -482,12 +488,15 @@ CONTAINS
 
        if (xtype == NF90_CHAR) then
           if (len > 256) then
-             !write(*,*) 'truncating attribute to length:', 256
+             write(*,*) 'truncating attribute to length:', 256
           endif
           status = nf90_get_att(ncid, varid, name, c1d )
           if (status /= 0) stop 'error calling get_att'
-          !write(*, '(a," ", a)') trim(name), trim(c1d)
-          attr_grid = c1d
+          attr_grid = trim(c1d)
+          name = trim(name)
+          write(attr_grid_total, '(A, " ", A)'), trim(name), trim(c1d)
+          write(*, *) "OCN attrgrid_total (in subroutine): ", trim(attr_grid_total) 
+          write(*, *) "OCN: xtype_attr NF90_CHAR: ", xtype
        else if ( xtype == NF90_INT ) then
           if (len > 1) then
              allocate( ivals(len) )
@@ -500,6 +509,7 @@ CONTAINS
              if (status /= 0) stop 'error calling get_att for integer'
              !write(6,'(a,3h:: ,(i6))') trim(name), ivals
           endif
+          write(*, *) "OCN: xtype_attr NF90_INT: ", xtype
        else if( xtype == NF90_FLOAT ) then
           if (len > 1) then
              allocate( rvals(len) )
@@ -512,6 +522,7 @@ CONTAINS
              if(status /= 0) stop "error calling get_att for real"
              !write(6, '(a,3h:: ,(e12.5))') trim(name), rval
           endif
+          write(*, *) "OCN: xtype_attr NF90_FLOAT: ", xtype
        else if( xtype == NF90_DOUBLE ) then
           if (len > 1) then
              allocate( rvals(len) )
@@ -524,7 +535,7 @@ CONTAINS
              if(status /= 0) stop "error calling get_att for real"
              !write(6, '(a,3h:: ,(e12.5))') trim(name), rval
           endif
-
+          write(*, *) "OCN: xtype_attr NF90_DOUBLE: ", xtype
        endif
     enddo
 
