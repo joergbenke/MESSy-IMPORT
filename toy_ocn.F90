@@ -75,79 +75,54 @@ CONTAINS
 
     CALL MPI_Comm_rank(comp_comm, comp_rank, ierror)
 
-    ! Read the grid and distribute it among all OCN processes
-!    CALL read_icon_grid( &
-!         grid_filename, comp_comm, cell_to_vertex, x_vertices, &
-!         y_vertices, x_cells, y_cells, cell_sea_land_mask, global_cell_id)
-!    num_vertices = SIZE(x_vertices)
-!    num_cells = SIZE(x_cells)
-!    num_vertices_per_cell = SIZE(cell_to_vertex, 1)
-
     ! Define local part of the grid
     call read_grid_from_netcdf(trim(grid_filename), num_vertices_lon, num_vertices_lat, num_cells, &
          x_vertices, y_vertices, x_cells, y_cells, attr_grid_total)
     num_vertices_per_cell = 4
-    write(*, *) "OCN: Values grid: ", num_vertices_lon, num_vertices_lat, num_vertices, num_cells, num_vertices_per_cell
-    write(*, *) "attr_grid_total (after read_grid_from_netcdf): ", attr_grid_total
-
-!    call MPI_BCAST(attr_grid_total, MPI_CHAR, 5000, comp_rank, MPI_COMM_WORLD, ierror)
 
     ! Allocate and fill the arry cell_to_vertex with the vertices of the elements
     allocate(cell_to_vertex(num_cells, 4))
-    write(*, *) "OCN: Size: ", size(cell_to_vertex, dim=1)
 
     ! Create the numbering of the cells (column wise; from bottom totop)
-    do i = 1, num_cells
-       if(i < num_vertices_lat) then
-          cell_to_vertex(i, 1) = 1 + (i - 1)
-          cell_to_vertex(i, 2) = 2 + (i - 1) 
-          cell_to_vertex(i, 3) = (1 + num_vertices_lat) + (i - 1)
-          cell_to_vertex(i, 4) = (2 + num_vertices_lat) + (i - 1)
-       else
-          cell_to_vertex(i, 1) = cell_to_vertex(i - (num_vertices_lat - 1), 3)
-          cell_to_vertex(i, 2) = cell_to_vertex(i - (num_vertices_lat - 1), 4) 
-          cell_to_vertex(i, 3) = cell_to_vertex(i, 1) + num_vertices_lat
-          cell_to_vertex(i, 4) = cell_to_vertex(i, 2) + num_vertices_lat
-       end if
-
-!     write(*, *) "element number: ", i, ", num_cells: ", num_cells
-!     write(*, *) cell_to_vertex(i, 1), cell_to_vertex(i, 2), cell_to_vertex(i, 3), cell_to_vertex(i, 4)
-    end do
+!    do i = 1, num_cells
+!       if(i < num_vertices_lat) then
+!          cell_to_vertex(i, 1) = 1 + (i - 1)
+!          cell_to_vertex(i, 2) = 2 + (i - 1) 
+!          cell_to_vertex(i, 3) = (1 + num_vertices_lat) + (i - 1)
+!          cell_to_vertex(i, 4) = (2 + num_vertices_lat) + (i - 1)
+!       else
+!          cell_to_vertex(i, 1) = cell_to_vertex(i - (num_vertices_lat - 1), 3)
+!          cell_to_vertex(i, 2) = cell_to_vertex(i - (num_vertices_lat - 1), 4) 
+!          cell_to_vertex(i, 3) = cell_to_vertex(i, 1) + num_vertices_lat
+!          cell_to_vertex(i, 4) = cell_to_vertex(i, 2) + num_vertices_lat
+!       end if
+!    end do
 
     ! Define the grid for YAC
-    write(*, *)
-    write(*, *) "OCN: Before YAC_FDEF_GRID"
-
     cyclic = (/ 1,0/)
     CALL yac_fdef_grid( &
          grid_name, (/ num_vertices_lon, num_vertices_lat /), cyclic, &
          x_vertices, y_vertices, grid_id )
     ! Interface for yac_fdef_grid_reg2d_dble 
 
-    !  CALL yac_fdef_grid ( &
+!   CALL yac_fdef_grid ( &
 !         grid_name, num_vertices, num_cells, num_vertices_per_cell, &
 !         x_vertices, y_vertices, cell_to_vertex, grid_id )
-    write(*, *) "OCN: After YAC_FDEF_GRID"
-    write(*, *)
     
     ! Define location of the actual data (on cell centers)
-    write(*, *)
-    write(*, *) "OCN: Before YAC_FDEF_POINTS"
+!    write(*, *)
+!    write(*, *) "OCN: Before YAC_FDEF_POINTS"
 
-    write(*, *) "num_vertices_lon, num_vertices_lat", num_vertices_lon, num_vertices_lat
-    write(*, *) "size x_cells, y_cells", size(x_vertices), size(y_vertices)
     CALL yac_fdef_points ( &
          grid_id, (/ num_vertices_lon, num_vertices_lat /), YAC_LOCATION_CORNER, &
          x_vertices, y_vertices, cell_point_id )
 
-!    write(*, *) "num_vertices_lon-1, num_vertices_lat-1", num_vertices_lon-1, num_vertices_lat-1
-!    write(*, *) "size x_cells, y_cells", size(x_cells), size(y_cells)
 !    CALL yac_fdef_points ( &
 !         grid_id, (/ num_vertices_lon-1, num_vertices_lat-1 /), YAC_LOCATION_CELL, &
 !         x_cells, y_cells, cell_point_id )
 
-    write(*, *)
-    write(*, *) "OCN: After YAC_FDEF_POINTS"
+!    write(*, *)
+!    write(*, *) "OCN: After YAC_FDEF_POINTS"
 
     ! Set global cell ids
     ! CALL yac_fset_global_index(global_cell_id, YAC_LOCATION_CELL, grid_id)
@@ -323,7 +298,6 @@ CONTAINS
        write(*, *) '***** OCN: Unable to read number of variables, etc (ocean) *****'
        stop
     endif
-    write(*, *) 'OCN: ndim, nvar, natt, k_un:', ndim, nvar, natt, k_un
 
     ! Output of the dimensions
     allocate(dimids(ndim))
@@ -333,8 +307,8 @@ CONTAINS
     do k = 1, ndim
        status = nf90_inquire_dimension(ncid, k, name, len)
        if (status /= nf90_noerr) then
-          !write(*, *) "n90_inquire_dimension error (ocean)" 
-          !write(*, *) status
+          write(*, *) "n90_inquire_dimension error (ocean)" 
+          write(*, *) status
           stop
        endif
 
@@ -348,7 +322,6 @@ CONTAINS
           num_vertices_lat = len
        end if
     enddo
-    write(*, *) "OCN: lon = ", num_vertices_lon, " lat = ", num_vertices_lat
 
     allocate(x_cells(num_vertices_lon))
     allocate(y_cells(num_vertices_lat))
@@ -356,17 +329,14 @@ CONTAINS
     ! Number of cells is product of vertices in lat and lon direction because
     ! usually the coordinates are centered in an element
     num_cells = num_vertices_lon * num_vertices_lat
-    write(*, *) "OCN: num_cells = ", num_cells
 
     ! Now correction to number of vertices if vertex is on a real node and not in cell center
     num_vertices_lon = num_vertices_lon + 1
     num_vertices_lat = num_vertices_lat + 1 
-    write(*, *) "OCN: new coords lon = ", num_vertices_lon, " new coords lat = ", num_vertices_lat
-
 
     ! Output of the variables
-    write(*, *)
-    write(*, *) "OCN: ----- Variables -----"
+!    write(*, *)
+!    write(*, *) "OCN: ----- Variables -----"
     attr_grid_total = ''
     do k = 1, nvar
        name = ''
@@ -377,13 +347,8 @@ CONTAINS
           stop
        endif
 
-       write(*,'(a,I3,a,a,a,I3,a,I3,a,I3)') "OCN: variable id: ", k, " varname: ", trim(name), ", vardatatype: ", &
-            xtype, ", vardim: ", ndims, ", variable number of attributes: ", natts
-
        if(index(trim(name), 'lon') /= 0) then
-          write(*, *) "OCN: lon found"
           allocate(x_vertices(num_vertices_lon))
-          write(*, *) "OCN: shape: ", shape(x_vertices)
           
           status = nf90_get_var( ncid, k, x_cells ) 
           if (status /= nf90_noerr) then
@@ -408,9 +373,7 @@ CONTAINS
        end if
 
        if(index(trim(name), 'lat') /= 0) then
-          write(*, *) "OCN: lat found (ocean)"
           allocate(y_vertices(num_vertices_lat))
-          write(*, *) "OCN: shape: ", shape(y_vertices)
 
           status = nf90_get_var( ncid, k, y_cells ) 
           if (status /= nf90_noerr) then
@@ -425,7 +388,7 @@ CONTAINS
           y_vertices(num_vertices_lat) = 90.0
 
           if(natts > 0) then
-             write(* ,*) 'OCN: ==== data attributes ===='
+!             write(* ,*) 'OCN: ==== data attributes ===='
              call parse_attr_list(ncid, natts, k, attr_grid_total)
              write(*, *)
              write(*, *) "OCN: attr_grid_total (lat): ", trim(attr_grid_total)
@@ -438,11 +401,8 @@ CONTAINS
 ! Allocate and fill the vertex arrays (for longitude and lattitude
     num_vertices = num_vertices_lon * num_vertices_lat
     
-    !write(*, *) "attr_grid = ", attr_grid
     ! Output of the attributes
-    !write(*, *) "----- Attributes -----"
     if(natt > 0) then
-       !write(*, *) '==== global attributes ===='
        call parse_attr_list(ncid, natt, nf90_global, attr_grid_total)
        write(*, *)
        write(*, *) "OCN: attr_grid_total (global): ", trim(attr_grid_total)
@@ -455,8 +415,8 @@ CONTAINS
   subroutine parse_attr_list( ncid, n_attr_loc, varid, attr_grid_total )
     use netcdf
 
-    character(len = 256) :: c1d, name
-    character(len = 2000) :: attr_grid_total
+    character(len = 1024) :: c1d, name
+    character(len = 4096) :: attr_grid_total
 
     integer(kind = 4) :: ncid, n_attr_loc, varid
     integer(kind = 4) :: xtype, len, status
@@ -472,19 +432,19 @@ CONTAINS
        status = nf90_inquire_attribute(ncid, varid, name, xtype, len, kk)
 
        if (xtype == NF90_CHAR) then
-          if (len > 256) then
-             write(*,*) 'truncating attribute to length:', 256
+          if (len > 1024) then
+             write(*,*) 'truncating attribute to length:', 1024
           endif
           status = nf90_get_att(ncid, varid, name, c1d )
           if (status /= 0) stop 'error calling get_att'
           name = trim(name)
           attr_grid_total = trim(attr_grid_total)
 
-          write(attr_grid_total, '(A, " ", A, " ", A, "; ")') trim(attr_grid_total), trim(name), trim(c1d)
-!          write(attr_grid_total, '(A, " ", A)'), trim(name), trim(c1d)
-          write(*, *) "OCN attrgrid_total (in subroutine): ", trim(attr_grid_total) 
-          write(*, *) "OCN: xtype_attr NF90_CHAR: ", xtype
+          write(attr_grid_total, '(A, "; ", A, " ", A)') trim(attr_grid_total), trim(name), trim(c1d)
+!          write(*, *) "OCN attrgrid_total (in subroutine): ", trim(attr_grid_total) 
+!          write(*, *) "OCN: xtype_attr NF90_CHAR: ", xtype
        else if ( xtype == NF90_INT ) then
+          write(*, *) "OCN: Attribute type is NF90_INT"
           if (len > 1) then
              allocate( ivals(len) )
              status = nf90_get_att(ncid, varid, name, ivals )
@@ -498,6 +458,7 @@ CONTAINS
           endif
           write(*, *) "OCN: xtype_attr NF90_INT: ", xtype
        else if( xtype == NF90_FLOAT ) then
+          write(*, *) "OCN: Attribute type is NF90_FLOAT"
           if (len > 1) then
              allocate( rvals(len) )
              status = nf90_get_att(ncid, varid, name, rvals )
@@ -509,8 +470,8 @@ CONTAINS
              if(status /= 0) stop "error calling get_att for real"
              !write(6, '(a,3h:: ,(e12.5))') trim(name), rval
           endif
-          write(*, *) "OCN: xtype_attr NF90_FLOAT: ", xtype
        else if( xtype == NF90_DOUBLE ) then
+          write(*, *) "OCN: Attribute type is NF90_DOUBLE"
           if (len > 1) then
              allocate( rvals(len) )
              status = nf90_get_att(ncid, varid, name, rvals )
@@ -522,7 +483,6 @@ CONTAINS
              if(status /= 0) stop "error calling get_att for real"
              !write(6, '(a,3h:: ,(e12.5))') trim(name), rval
           endif
-          write(*, *) "OCN: xtype_attr NF90_DOUBLE: ", xtype
        endif
     enddo
   end subroutine parse_attr_list
