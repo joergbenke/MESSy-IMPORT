@@ -37,10 +37,11 @@ MODULE toy_atm
   integer(kind = 4) :: i
 
   ! Basic decomposed grid information
-  INTEGER(kind = 4)             :: num_vertices_lon, num_vertices_lat, num_vertices
-  INTEGER(kind = 4)             :: num_cells, num_vertices_per_cell
+  INTEGER(kind = 4)        :: num_vertices_lon, num_vertices_lat, num_vertices
+  INTEGER(kind = 4)        :: num_cells, num_vertices_per_cell
   
-  INTEGER, ALLOCATABLE          :: cell_to_vertex(:,:)
+  integer, allocatable     :: global_cell_ids(:)
+  INTEGER, ALLOCATABLE     :: cell_to_vertex(:,:)
 
   DOUBLE PRECISION, ALLOCATABLE :: x_vertices(:), y_vertices(:)
   DOUBLE PRECISION, ALLOCATABLE :: x_cells(:), y_cells(:)
@@ -90,7 +91,8 @@ CONTAINS
 
     ! Allocate and fill the arry cell_to_vertex with the vertices of the elements
     allocate(cell_to_vertex(num_cells, 4))
-
+    allocate(global_cell_ids(num_cells))
+    
     ! Create the numerbing of the cells (column wise; from bottom totop)
 !    do i = 1, num_cells
 !       if(i < num_vertices_lat) then
@@ -123,10 +125,10 @@ CONTAINS
     write(*, *)
 
     write( grid_metadata,'(A)') attr_grid_total
-    CALL yac_fdef_grid_metadata(grid_name, grid_metadata) 
+    CALL yac_fdef_grid_metadata(grid_name, grid_metadata)
 
     ! Set global cell ids
-    ! CALL yac_fset_global_index(global_cell_id, YAC_LOCATION_CELL, grid_id)
+    ! CALL yac_fset_global_index(global_cell_ids, YAC_LOCATION_CELL, grid_id)
 
     ! Define location of the actual data (on cell centers)
     write(*, *)
@@ -455,10 +457,8 @@ CONTAINS
           if (status /= 0) stop 'error calling get_att'
           name = trim(name)
           attr_grid_total = trim(attr_grid_total)
-          write(*, *) "ATM: attr_grid_total: ", trim(attr_grid_total)
-!          write(*, *) "ATM: xtype attr NF90_CHAR:", xtype
           write(attr_grid_total, '(A, " ", A, " ", A, "; ")') trim(attr_grid_total), trim(name), trim(c1d)
-!          write(*, *) "ATM attrgrid total (in subroutine): ", trim(attr_grid_total) 
+          write(*, *) "ATM: attr_grid_total: ", trim(attr_grid_total)
        else if ( xtype == NF90_INT ) then
           if (len > 1) then
              allocate( ivals(len) )

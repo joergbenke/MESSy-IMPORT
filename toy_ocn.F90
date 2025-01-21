@@ -40,13 +40,13 @@ MODULE toy_ocn
   ! Basic decomposed grid information
   INTEGER(kind = 4)             :: num_vertices_lon, num_vertices_lat, num_vertices
   INTEGER(kind = 4)             :: num_cells, num_vertices_per_cell
-  INTEGER(kind = 4), ALLOCATABLE  :: cell_to_vertex(:,:)
 
   DOUBLE PRECISION, ALLOCATABLE :: x_vertices(:), y_vertices(:)
   DOUBLE PRECISION, ALLOCATABLE :: x_cells(:), y_cells(:)
 
 !  INTEGER, ALLOCATABLE          :: cell_sea_land_mask(:)
 !  INTEGER, ALLOCATABLE          :: global_cell_id(:)
+  integer, allocatable     :: global_cell_ids(:)
 
   ! Buffer for field data
   DOUBLE PRECISION, DIMENSION(:,:), ALLOCATABLE :: &
@@ -80,23 +80,7 @@ CONTAINS
          x_vertices, y_vertices, x_cells, y_cells, attr_grid_total)
     num_vertices_per_cell = 4
 
-    ! Allocate and fill the arry cell_to_vertex with the vertices of the elements
-    allocate(cell_to_vertex(num_cells, 4))
-
-    ! Create the numbering of the cells (column wise; from bottom totop)
-!    do i = 1, num_cells
-!       if(i < num_vertices_lat) then
-!          cell_to_vertex(i, 1) = 1 + (i - 1)
-!          cell_to_vertex(i, 2) = 2 + (i - 1) 
-!          cell_to_vertex(i, 3) = (1 + num_vertices_lat) + (i - 1)
-!          cell_to_vertex(i, 4) = (2 + num_vertices_lat) + (i - 1)
-!       else
-!          cell_to_vertex(i, 1) = cell_to_vertex(i - (num_vertices_lat - 1), 3)
-!          cell_to_vertex(i, 2) = cell_to_vertex(i - (num_vertices_lat - 1), 4) 
-!          cell_to_vertex(i, 3) = cell_to_vertex(i, 1) + num_vertices_lat
-!          cell_to_vertex(i, 4) = cell_to_vertex(i, 2) + num_vertices_lat
-!       end if
-!    end do
+    allocate(global_cell_ids(num_cells))
 
     ! Define the grid for YAC
     cyclic = (/ 1,0/)
@@ -105,14 +89,15 @@ CONTAINS
          x_vertices, y_vertices, grid_id )
     ! Interface for yac_fdef_grid_reg2d_dble 
 
-!   CALL yac_fdef_grid ( &
-!         grid_name, num_vertices, num_cells, num_vertices_per_cell, &
-!         x_vertices, y_vertices, cell_to_vertex, grid_id )
-    
     ! Define location of the actual data (on cell centers)
-!    write(*, *)
-!    write(*, *) "OCN: Before YAC_FDEF_POINTS"
+    !    write(*, *)
+    !    write(*, *) "OCN: Before YAC_FDEF_POINTS"
 
+    write( grid_metadata,'(A)') attr_grid_total
+    CALL yac_fdef_grid_metadata(grid_name, grid_metadata) 
+    call yac_fdef_field_metadata(comp_name, grid_name, field_name, 
+
+    
     CALL yac_fdef_points ( &
          grid_id, (/ num_vertices_lon, num_vertices_lat /), YAC_LOCATION_CORNER, &
          x_vertices, y_vertices, cell_point_id )
@@ -125,7 +110,7 @@ CONTAINS
 !    write(*, *) "OCN: After YAC_FDEF_POINTS"
 
     ! Set global cell ids
-    ! CALL yac_fset_global_index(global_cell_id, YAC_LOCATION_CELL, grid_id)
+    ! CALL yac_fset_global_index(global_cell_ids, YAC_LOCATION_CELL, grid_id)
 
     ! Set mask for cell centers
     ! CALL yac_fset_mask(cell_sea_land_mask < 0, cell_point_id)
@@ -441,20 +426,17 @@ CONTAINS
           attr_grid_total = trim(attr_grid_total)
 
           write(attr_grid_total, '(A, "; ", A, " ", A)') trim(attr_grid_total), trim(name), trim(c1d)
-!          write(*, *) "OCN attrgrid_total (in subroutine): ", trim(attr_grid_total) 
-!          write(*, *) "OCN: xtype_attr NF90_CHAR: ", xtype
+          write(*, *) "OCN attrgrid_total (in subroutine): ", trim(attr_grid_total) 
        else if ( xtype == NF90_INT ) then
           write(*, *) "OCN: Attribute type is NF90_INT"
           if (len > 1) then
              allocate( ivals(len) )
              status = nf90_get_att(ncid, varid, name, ivals )
              if (status /= 0) stop "error calling get_att for integer array"
-             !write(*,'(a,3h:: ,(i6))') trim(name), ivals
              deallocate( ivals )
           else
              status = nf90_get_att(ncid, varid, name, ivals )
              if (status /= 0) stop 'error calling get_att for integer'
-             !write(6,'(a,3h:: ,(i6))') trim(name), ivals
           endif
           write(*, *) "OCN: xtype_attr NF90_INT: ", xtype
        else if( xtype == NF90_FLOAT ) then
@@ -463,12 +445,10 @@ CONTAINS
              allocate( rvals(len) )
              status = nf90_get_att(ncid, varid, name, rvals )
              if (status /= 0) stop 'error calling get_att for real array'
-             !write(*,'(a,3h:: ,(e12.5))') trim(name), rvals
              deallocate( rvals )
           else
              status = nf90_get_att(ncid, varid, name, rval )
              if(status /= 0) stop "error calling get_att for real"
-             !write(6, '(a,3h:: ,(e12.5))') trim(name), rval
           endif
        else if( xtype == NF90_DOUBLE ) then
           write(*, *) "OCN: Attribute type is NF90_DOUBLE"
@@ -476,12 +456,10 @@ CONTAINS
              allocate( rvals(len) )
              status = nf90_get_att(ncid, varid, name, rvals )
              if (status /= 0) stop "error calling get_att for real array"
-             !write(*, '(a,3h:: ,(e12.5))') trim(name), rvals
              deallocate( rvals )
           else
              status = nf90_get_att(ncid, varid, name, rval )
              if(status /= 0) stop "error calling get_att for real"
-             !write(6, '(a,3h:: ,(e12.5))') trim(name), rval
           endif
        endif
     enddo

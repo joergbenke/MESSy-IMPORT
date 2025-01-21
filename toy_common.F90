@@ -137,15 +137,13 @@ MODULE toy_common
     INTEGER, INTENT(IN) :: comp_id
     INTEGER, INTENT(IN) :: point_id
 
-    INTEGER, INTENT(OUT) :: field_taux_id
-    INTEGER, INTENT(OUT) :: field_tauy_id
+    INTEGER, INTENT(OUT) :: field_taux_id, field_tauy_id
     INTEGER, INTENT(OUT) :: field_sfwflx_id
     INTEGER, INTENT(OUT) :: field_sftemp_id
     INTEGER, INTENT(OUT) :: field_thflx_id
     INTEGER, INTENT(OUT) :: field_iceatm_id
     INTEGER, INTENT(OUT) :: field_sst_id
-    INTEGER, INTENT(OUT) :: field_oceanu_id
-    INTEGER, INTENT(OUT) :: field_oceanv_id
+    INTEGER, INTENT(OUT) :: field_oceanu_id, field_oceanv_id
     INTEGER, INTENT(OUT) :: field_iceoce_id
 
 
