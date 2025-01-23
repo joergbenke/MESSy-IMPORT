@@ -20,9 +20,9 @@ coupling:
   scale_factor: 1
   scale_summand: 0
   interpolation:
-  - conservative:
-      partial_coverage: true
-      normalisation: fracarea
+  - nnn:
+      n: 4
+      weighted: arithmetic_average
   - fixed:
       user_value: -999.9
 - src_component: atm_comp
@@ -38,9 +38,9 @@ coupling:
   scale_factor: 1
   scale_summand: 0
   interpolation:
-  - bernstein_bezier
   - nnn:
       n: 4
+      weighted: arithmetic_average
   - fixed:
       user_value: -999.9
 - src_component: atm_comp
@@ -56,9 +56,9 @@ coupling:
   scale_factor: 1
   scale_summand: 0
   interpolation:
-  - bernstein_bezier
   - nnn:
       n: 4
+      weighted: arithmetic_average
   - fixed:
       user_value: -999.9
 - src_component: atm_comp
@@ -74,9 +74,9 @@ coupling:
   scale_factor: 1
   scale_summand: 0
   interpolation:
-  - conservative:
-      partial_coverage: true
-      normalisation: fracarea
+  - nnn:
+      n: 4
+      weighted: arithmetic_average
   - fixed:
       user_value: -999.9
 - src_component: atm_comp
@@ -92,9 +92,9 @@ coupling:
   scale_factor: 1
   scale_summand: 0
   interpolation:
-  - conservative:
-      partial_coverage: true
-      normalisation: fracarea
+  - nnn:
+      n: 4
+      weighted: arithmetic_average
   - fixed:
       user_value: -999.9
 - src_component: atm_comp
@@ -110,9 +110,9 @@ coupling:
   scale_factor: 1
   scale_summand: 0
   interpolation:
-  - conservative:
-      partial_coverage: true
-      normalisation: fracarea
+  - nnn:
+      n: 4
+      weighted: arithmetic_average
   - fixed:
       user_value: -999.9
 - src_component: ocn_comp
@@ -128,9 +128,9 @@ coupling:
   scale_factor: 1
   scale_summand: 0
   interpolation:
-  - conservative:
-      partial_coverage: true
-      normalisation: fracarea
+  - nnn:
+      n: 4
+      weighted: arithmetic_average
   - fixed:
       user_value: -999.9
 - src_component: ocn_comp
@@ -146,9 +146,9 @@ coupling:
   scale_factor: 1
   scale_summand: 0
   interpolation:
-  - conservative:
-      partial_coverage: true
-      normalisation: fracarea
+  - nnn:
+      n: 4
+      weighted: arithmetic_average
   - fixed:
       user_value: -999.9
 - src_component: ocn_comp
@@ -164,9 +164,9 @@ coupling:
   scale_factor: 1
   scale_summand: 0
   interpolation:
-  - conservative:
-      partial_coverage: true
-      normalisation: fracarea
+  - nnn:
+      n: 4
+      weighted: arithmetic_average
   - fixed:
       user_value: -999.9
 - src_component: ocn_comp
@@ -182,8 +182,8 @@ coupling:
   scale_factor: 1
   scale_summand: 0
   interpolation:
-  - conservative:
-      partial_coverage: true
-      normalisation: fracarea
+  - nnn:
+      n: 4
+      weighted: arithmetic_average
   - fixed:
       user_value: -999.9
