@@ -289,6 +289,7 @@ CONTAINS
     integer(kind = 4), intent(out) :: num_vertices_lon, num_vertices_lat, num_cells
     integer, allocatable, dimension(:) :: dimids
 
+    real(kind = 8) :: correction_value_lon, correction_value_lat
     real(kind = 8), allocatable, dimension(:) :: x_vertices, y_vertices
     real(kind = 8), allocatable, dimension(:) :: x_cells, y_cells
     
@@ -375,11 +376,22 @@ CONTAINS
           endif
 
           ! Correction
-          do i = 1, num_vertices_lon - 1
-             x_vertices(i) = x_cells(i) - 0.5
-          end do
+          ! Assumption:
+          !    - whole erath (360 degrees laongitude, 180 degrees latitude)
+          !    - cell centered and corner centered coordinates
+          correction_value_lon = 360.0 / ((num_vertices_lon - 1) * 2)
+          write(*, *) "ATM: correction_value_lon: ", correction_value_lon
+          if( abs( x_cells(1) - (-180.0) ) > 1e-10) then
+             write(*, *) "ATM: Cell centered values"
+             do i = 1, num_vertices_lon - 1
+                x_vertices(i) = x_cells(i) - correction_value_lon  ! 0.5
+             end do
+          else
+             write(*, *) "ATM: Corner Centered values"
+          end if
           x_vertices(num_vertices_lon) = 180.0
-
+          write(*, *) x_vertices
+          
           if(natts > 0) then
              write(* ,*) '==== ATM: data attributes (local) ===='
              call parse_attr_list(ncid, natts, k, attr_grid_total)
@@ -399,9 +411,20 @@ CONTAINS
              stop 
           endif
 
-          do i = 1, num_vertices_lat - 1
-             y_vertices(i) = y_cells(i) - 0.5
-          end do
+          ! Corection
+          ! Assumption:
+          !    - whole erath (360 degrees laongitude, 180 degrees latitude)
+          !    - cell and corner centered coordinates
+          correction_value_lat = 180.0 / ((num_vertices_lat - 1) * 2)
+          write(*, *) "ATM: correction_value_lat: ", correction_value_lat
+          if( (y_cells(1) - (-90.0)) > 1e-10) then
+             write(*, *) "ATM: Cell centered values"
+             do i = 1, num_vertices_lat - 1
+                y_vertices(i) = y_cells(i) - correction_value_lat  !0.5
+             end do
+          else
+             write(*, *) "ATM: Cell centered values"
+          end if
           y_vertices(num_vertices_lat) = 90.0
 
           if(natts > 0) then
