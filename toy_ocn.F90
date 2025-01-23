@@ -44,8 +44,6 @@ MODULE toy_ocn
   DOUBLE PRECISION, ALLOCATABLE :: x_vertices(:), y_vertices(:)
   DOUBLE PRECISION, ALLOCATABLE :: x_cells(:), y_cells(:)
 
-!  INTEGER, ALLOCATABLE          :: cell_sea_land_mask(:)
-!  INTEGER, ALLOCATABLE          :: global_cell_id(:)
   integer, allocatable     :: global_cell_ids(:)
 
   ! Buffer for field data
@@ -95,7 +93,7 @@ CONTAINS
 
     write( grid_metadata,'(A)') attr_grid_total
     CALL yac_fdef_grid_metadata(grid_name, grid_metadata) 
-    call yac_fdef_field_metadata(comp_name, grid_name, field_name, 
+!    call yac_fdef_field_metadata(comp_name, grid_name, field_name, 
 
     
     CALL yac_fdef_points ( &

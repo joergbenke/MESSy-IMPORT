@@ -46,7 +46,6 @@ MODULE toy_atm
   DOUBLE PRECISION, ALLOCATABLE :: x_vertices(:), y_vertices(:)
   DOUBLE PRECISION, ALLOCATABLE :: x_cells(:), y_cells(:)
 
-!  INTEGER, ALLOCATABLE          :: cell_sea_land_mask(:)
 !  INTEGER, ALLOCATABLE          :: global_cell_id(:)
 
   ! Buffer for field data
