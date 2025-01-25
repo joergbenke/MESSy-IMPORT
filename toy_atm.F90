@@ -127,7 +127,7 @@ CONTAINS
     CALL yac_fdef_grid_metadata(grid_name, grid_metadata)
 
     ! Set global cell ids
-    ! CALL yac_fset_global_index(global_cell_ids, YAC_LOCATION_CELL, grid_id)
+    CALL yac_fset_global_index(global_cell_ids, YAC_LOCATION_CELL, grid_id)
 
     ! Define location of the actual data (on cell centers)
     write(*, *)
