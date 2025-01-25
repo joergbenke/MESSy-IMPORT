@@ -108,7 +108,7 @@ CONTAINS
 !    write(*, *) "OCN: After YAC_FDEF_POINTS"
 
     ! Set global cell ids
-    ! CALL yac_fset_global_index(global_cell_ids, YAC_LOCATION_CELL, grid_id)
+    CALL yac_fset_global_index(global_cell_ids, YAC_LOCATION_CELL, grid_id)
 
     ! Set mask for cell centers
     ! CALL yac_fset_mask(cell_sea_land_mask < 0, cell_point_id)
