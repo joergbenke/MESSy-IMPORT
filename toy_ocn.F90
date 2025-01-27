@@ -6,6 +6,7 @@ MODULE toy_ocn
 
   USE mpi
   USE yac
+  USE netcdf
   USE yac_utils, ONLY : yac_test_gulfstream_c
   USE toy_common, ONLY : read_icon_grid, nsteps, define_fields, &
                          send_field, receive_field, max_char_length
@@ -18,7 +19,6 @@ MODULE toy_ocn
 
   ! Basic string paramters
   CHARACTER(LEN=max_char_length), PARAMETER :: yaml_filename = "input/coupling.yaml"
-  CHARACTER(LEN=max_char_length), PARAMETER :: grid_filename = "grids/GEIA_MPIC1.0_X_bioland_NH3_2000-2000.nc"
   CHARACTER(LEN=max_char_length), PARAMETER :: comp_name = "ocn_comp"
   CHARACTER(LEN=max_char_length), PARAMETER :: grid_name = "ocn_grid"
   character(len = 5000) :: attr_grid_total
@@ -56,10 +56,25 @@ CONTAINS
 
   SUBROUTINE main_ocn(comm)
 
-    INTEGER, INTENT(IN) :: comm
-    integer, dimension(2) :: cyclic = (/1, 0 /)
+    CHARACTER(LEN=max_char_length), PARAMETER :: grid_filename = "grids/GEIA_MPIC1.0_X_bioland_NH3_2000-2000.nc"
+    character(len = 1000) :: name
     character(len = 5000) :: grid_metadata
 
+    integer, intent(in) :: comm
+    ! netCDF file identifier
+    integer :: ncid
+    ! Number of dimensions, variables, attributes and time steps in netCDF file
+    integer :: ndim, nvar, natt, k_un
+    integer :: natts, xtype, ndims
+    ! number 
+    integer :: k, len
+    integer :: num_vertices_lon, num_vertices_lat
+    integer :: status
+    integer, dimension(2) :: cyclic = (/1, 0 /)
+    integer, allocatable, dimension(:) :: dimids
+
+    real :: correction_value_lat = 0.0, correction_value_lon = 0.0
+    
     comp_comm = comm
 
     ! Read coupling configuration file
@@ -71,14 +86,175 @@ CONTAINS
     ! Retrieve communicator for OCN component
     CALL yac_fget_comp_comm(comp_id, comp_comm)
 
+    ! Get MPI rank
     CALL MPI_Comm_rank(comp_comm, comp_rank, ierror)
 
+    !
+    ! From here read netCDF file
+    !
+    
+    ! Open netCDF file
+    write(*, *)
+    write(*, *) "----- OCN: Open ocean netCDF file -----"
+    status = nf90_open(trim(grid_filename), nf90_nowrite, ncid)
+    if(status /= nf90_noerr) then
+       write(*, *) 'OCN: could not open (ocean): ', grid_filename
+       write(*, *) status
+       write(*, *) '***** OCN: Unable to find netCDF file (ocean) *****'
+       stop
+    endif
+
+    ! Inquiry of the nuber of variables, etc
+    write(*, *)
+    write(*, *) "----- OCN: Inquire number of dimensions, variables, etc -----"
+    status = nf90_inquire(ncid, ndim, nvar, natt, k_un)
+    if (status /= nf90_noerr) then
+       write(*, *) 'OCN: nf90_inquire error (ocean)'
+       write(*, *) status
+       write(*, *) '***** OCN: Unable to read number of variables, etc (ocean) *****'
+       stop
+    endif
+
+    write(*, *)
+    write(*, *) "----- OCN: Output of dimensions id, length and name -----"
+    do k = 1, ndim
+       status = nf90_inquire_dimension(ncid, k, name, len)
+       if (status /= nf90_noerr) then
+          write(*, *) "n90_inquire_dimension error (ocean)" 
+          write(*, *) status
+          stop
+       endif
+
+       ! read number vertices in longitude directions (vertex is midpoint of cell)
+       if(index(trim(name), 'lon') /= 0) then
+          num_vertices_lon = len
+       end if
+
+       ! read number vertices in lattitude directions (vertex is midpoint of cell)
+       if(index(trim(name), 'lat') /= 0) then
+          num_vertices_lat = len
+       end if
+    enddo
+    
+    allocate(x_cells(num_vertices_lon))
+    allocate(y_cells(num_vertices_lat))
+
+    ! Number of cells is product of vertices in lat and lon direction because
+    ! usually the coordinates are centered in an element
+    num_cells = num_vertices_lon * num_vertices_lat
+
+    ! Now correction to number of vertices if vertex is on a real node and not in cell center
+    num_vertices_lon = num_vertices_lon + 1
+    num_vertices_lat = num_vertices_lat + 1 
+
+    ! Output of the dimensions
+    allocate(dimids(ndim))
+
+    attr_grid_total = ''
+    do k = 1, nvar
+       name = ''
+       status = nf90_inquire_variable(ncid, k, name, xtype, ndims, dimids, natts)
+       if (status /= nf90_noerr) then
+          write(*, *) "OCN: n90_inquire_variable error"
+          write(*, *) status
+          stop
+       endif
+
+       if(index(trim(name), 'lon') /= 0) then
+          allocate(x_vertices(num_vertices_lon))
+          
+          status = nf90_get_var( ncid, k, x_cells ) !(/ 1,1,1 /) )
+          if (status /= nf90_noerr) then
+             write(*, *) "***** OCN: n90_get_var error *****"
+             write(*, *) "OCN: status nf90_get_var: ", status
+             stop 
+          endif
+
+          ! Correction
+          ! Assumption:
+          !    - whole erath (360 degrees laongitude, 180 degrees latitude)
+          !    - cell centered and corner centered coordinates
+          correction_value_lon = 360.0 / ((num_vertices_lon - 1) * 2)
+          write(*, *) "OCN: correction_value_lon: ", correction_value_lon
+          if( abs( x_cells(1) - (-180.0) ) > 1e-10) then
+             write(*, *) "OCN: Cell centered values"
+             do i = 1, num_vertices_lon - 1
+                x_vertices(i) = x_cells(i) - correction_value_lon  ! 0.5
+             end do
+          else
+             write(*, *) "OCN: Corner Centered values"
+          end if
+          x_vertices(num_vertices_lon) = 180.0
+          write(*, *) x_vertices
+          
+          if(natts > 0) then
+             write(* ,*) '==== OCN: data attributes (local) ===='
+             call parse_attr_list(ncid, natts, k, attr_grid_total)
+             write(*, *)
+             write(*, *) "OCN: attr_grid_total (lon; from call): ", trim(attr_grid_total)
+             write(*, *)
+          endif
+       end if
+
+       if(index(trim(name), 'lat') /= 0) then
+          allocate(y_vertices(num_vertices_lat))
+
+          status = nf90_get_var( ncid, k, y_cells ) 
+          if (status /= nf90_noerr) then
+             write(*, *) "***** OCN: n90_get_var error *****"
+             write(*, *) "OCN: status nf90_get_var: ", status
+             stop 
+          endif
+
+          ! Corection
+          ! Assumption:
+          !    - whole erath (360 degrees laongitude, 180 degrees latitude)
+          !    - cell and corner centered coordinates
+          correction_value_lat = 180.0 / ((num_vertices_lat - 1) * 2)
+          write(*, *) "OCN: correction_value_lat: ", correction_value_lat
+          if( (y_cells(1) - (-90.0)) > 1e-10) then
+             write(*, *) "OCN: Cell centered values"
+             do i = 1, num_vertices_lat - 1
+                y_vertices(i) = y_cells(i) - correction_value_lat  !0.5
+             end do
+          else
+             write(*, *) "OCN: Cell centered values"
+          end if
+          y_vertices(num_vertices_lat) = 90.0
+
+          if(natts > 0) then
+             write(* ,*) '==== OCN: data attributes (local) ===='
+             call parse_attr_list(ncid, natts, k, attr_grid_total)
+             write(*, *)
+             write(*, *) "OCN: attr_grid_total (lat; from call): ", trim(attr_grid_total)
+             write(*, *)
+          endif
+       end if
+    enddo
+
+
+! Allocate and fill the vertex arrays (for longitude and lattitude
+    num_vertices = num_vertices_lon * num_vertices_lat
+
+    ! Output of the attributes
+    if(natt > 0) then
+       write(*, *) '==== OCN: global attributes ===='
+       call parse_attr_list(ncid, natt, nf90_global, attr_grid_total)
+       write(*, *)
+       write(*, *) "OCN: attr_grid_total (global; from call): ", trim(attr_grid_total)
+       write(*, *)
+    endif
+
+    !
+    ! End of reading netCDF file
+    !
+
+    
     ! Define local part of the grid
-    call read_grid_from_netcdf(trim(grid_filename), num_vertices_lon, num_vertices_lat, num_cells, &
-         x_vertices, y_vertices, x_cells, y_cells, attr_grid_total)
+    !    call read_grid_from_netcdf(trim(grid_filename), num_vertices_lon, num_vertices_lat, num_cells, &
+    !         x_vertices, y_vertices, x_cells, y_cells, attr_grid_total)
     num_vertices_per_cell = 4
 
-    allocate(global_cell_ids(num_cells))
 
     ! Define the grid for YAC
     cyclic = (/ 1,0/)
@@ -95,7 +271,10 @@ CONTAINS
     CALL yac_fdef_grid_metadata(grid_name, grid_metadata) 
 !    call yac_fdef_field_metadata(comp_name, grid_name, field_name, 
 
-    
+    ! Set global cell ids
+    allocate(global_cell_ids(num_cells))
+    CALL yac_fset_global_index(global_cell_ids, YAC_LOCATION_CELL, grid_id)
+
     CALL yac_fdef_points ( &
          grid_id, (/ num_vertices_lon, num_vertices_lat /), YAC_LOCATION_CORNER, &
          x_vertices, y_vertices, cell_point_id )
@@ -106,9 +285,6 @@ CONTAINS
 
 !    write(*, *)
 !    write(*, *) "OCN: After YAC_FDEF_POINTS"
-
-    ! Set global cell ids
-    CALL yac_fset_global_index(global_cell_ids, YAC_LOCATION_CELL, grid_id)
 
     ! Set mask for cell centers
     ! CALL yac_fset_mask(cell_sea_land_mask < 0, cell_point_id)
