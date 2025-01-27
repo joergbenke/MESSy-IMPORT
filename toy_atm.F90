@@ -151,9 +151,9 @@ CONTAINS
           stop
        endif
 
-    instance_dimension_attr%number_of_dim = k
-    instance_dimension_attr%len_of_dim = len
-    instance_dimension_attr%name_of_dim = name
+       instance_dimension_attr%number_of_dim = k
+       instance_dimension_attr%len_of_dim = len
+       instance_dimension_attr%name_of_dim = name
     
        ! read number vertices in longitude directions (vertex is midpoint of cell)
        if(index(trim(name), 'lon') /= 0) then
@@ -196,10 +196,32 @@ CONTAINS
        if(xtype == 5) THEN
           write(*, *) "Type DOUBLE"
           if(ndims == 1) then
-!             allocate(field_1d())
+             write(*, *) "dimids(1): ", dimids(1)
+             instance_dimension_attr%len_of_dim = dimids(1)
+             write(*, *) "instance_dimension_attr%len_of_dim: ", instance_dimension_attr%len_of_dim
+             write(*, *) "field_double_1d(instance_dimension_attr%len_of_dim(dimids(1))): ", &
+                  field_double_1d(instance_dimension_attr%len_of_dim)
+             !allocate(field_double_1d(instance_dimension_attr%len_of_dim))
+
+             ! Get values fron variable 
+             status = nf90_get_var( ncid, k, field_double_1d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** ATM: n90_get_var error *****"
+                write(*, *) "ATM: status nf90_get_var: ", status
+                stop 
+             endif
+
           endif
           if(ndims == 2) then
-!             allocate(field_2d)
+ !            allocate(field_double_2d(instance_dimension_attr%len_of_dim(dimids(1))), &
+ !                 instance_dimension_attr%len_of_dim(dimids(1)))
+             ! Get values fron variable 
+             status = nf90_get_var( ncid, k, field_double_2d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** ATM: n90_get_var error *****"
+                write(*, *) "ATM: status nf90_get_var: ", status
+                stop 
+             endif
           endif
        end if
        
@@ -287,7 +309,7 @@ CONTAINS
           endif
           cycle
        end if
-       
+
     enddo
 
 
