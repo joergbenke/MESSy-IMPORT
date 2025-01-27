@@ -76,16 +76,29 @@ CONTAINS
     integer, dimension(2) :: cyclic = (/1, 0 /)
     integer, allocatable, dimension(:) :: dimids
 
-    real :: correction_value_lat = 0.0, correction_value_lon = 0.0
+    real(kind = 8) :: correction_value_lat = 0.0, correction_value_lon = 0.0
+    real(kind = 8), allocatable, dimension(:) :: field_double_1d
+    real(kind = 8), allocatable, dimension(:, :) :: field_double_2d 
+    real(kind = 8), allocatable, dimension(:) :: field_float_1d
+    real(kind = 8), allocatable, dimension(:, :) :: field_float_2d 
+
+    type dimension_attr
+       integer :: number_of_dim
+       integer :: len_of_dim
+       character(len = 128) :: name_of_dim
+    end type dimension_attr
+    type(dimension_attr) :: instance_dimension_attr
+
     
     comp_comm = comm
 
     ! Read coupling configuration file
     CALL yac_fread_config_yaml(yaml_filename)
 
-    ! Define local component
+    ! Define local component and add metadata
     CALL yac_fdef_comp(comp_name, comp_id)
-
+    call yac_fdef_component_metadata(comp_name, "Component MESSy IMPORT Server" )
+    
     ! Retrieve communicator for ATM component
     CALL yac_fget_comp_comm(comp_id, comp_comm)
 
@@ -103,6 +116,8 @@ CONTAINS
     !
     ! From here read netCDF file
     !
+
+
     
     ! Open netCDF file
     write(*, *)
@@ -136,6 +151,10 @@ CONTAINS
           stop
        endif
 
+    instance_dimension_attr%number_of_dim = k
+    instance_dimension_attr%len_of_dim = len
+    instance_dimension_attr%name_of_dim = name
+    
        ! read number vertices in longitude directions (vertex is midpoint of cell)
        if(index(trim(name), 'lon') /= 0) then
           num_vertices_lon = len
@@ -171,6 +190,30 @@ CONTAINS
           stop
        endif
 
+       write(*, *) "ATM: Results of nf90_inquire_varibale call: ", ncid, ", ", k, ", ", trim(name), ", ", xtype, ", "
+       write(*, *) "ATM: Results of nf90_inquire_varibale call: ", ndims, ", ", dimids, ", ", natts
+
+       if(xtype == 5) THEN
+          write(*, *) "Type DOUBLE"
+          if(ndims == 1) then
+!             allocate(field_1d())
+          endif
+          if(ndims == 2) then
+!             allocate(field_2d)
+          endif
+       end if
+       
+       if(xtype == 4) THEN
+          write(*, *) "Type FLOAT"
+          if(ndims == 1) then
+!             allocate(field_1d)
+          endif
+          if(ndims == 2) then
+!             allocate(field_2d)
+          endif
+       end if
+
+       
        if(index(trim(name), 'lon') /= 0) then
           allocate(x_vertices(num_vertices_lon))
           
@@ -205,6 +248,8 @@ CONTAINS
              write(*, *) "ATM: attr_grid_total (lon; from call): ", trim(attr_grid_total)
              write(*, *)
           endif
+
+          cycle
        end if
 
        if(index(trim(name), 'lat') /= 0) then
@@ -240,7 +285,9 @@ CONTAINS
              write(*, *) "ATM: attr_grid_total (lat; from call): ", trim(attr_grid_total)
              write(*, *)
           endif
+          cycle
        end if
+       
     enddo
 
 
