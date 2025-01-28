@@ -86,12 +86,24 @@ CONTAINS
     real(kind = 8), allocatable, dimension(:, :, :) :: field_float_3d 
     real(kind = 8), allocatable, dimension(:, :, :, :) :: field_float_4d 
 
+    INTEGER :: point_id
+    integer :: collection_size = 1
+    integer :: def_field = -1
+    INTEGER, PARAMETER :: num_point_ids = 1
+    INTEGER :: point_ids(num_point_ids)
+    CHARACTER(LEN=max_char_length), PARAMETER :: timestep = "1"
+    INTEGER, PARAMETER :: timestep_unit = YAC_TIME_UNIT_SECOND
+
+    
     type dimension_attr
        integer :: number_of_dim
        integer :: len_of_dim
        character(len = 1000) :: name_of_dim
     end type dimension_attr
     type(dimension_attr), allocatable, dimension(:) :: instance_dimension_attr
+
+    def_field = -1
+    point_ids(1) = point_id
 
     
     comp_comm = comm
@@ -264,6 +276,12 @@ CONTAINS
              write(*, *) field_double_1d
              write(*, *)
              write(*, *) "ATM: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+
              deallocate(field_double_1d)
           endif
 
@@ -287,6 +305,12 @@ CONTAINS
              write(*, *) field_double_2d
              write(*, *)
              write(*, *) "ATM: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+
              deallocate(field_double_2d)
           endif
 
@@ -314,6 +338,12 @@ CONTAINS
              write(*, *) field_double_3d
              write(*, *)
              write(*, *) "ATM: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+
              deallocate(field_double_3d)
           endif
 
@@ -344,6 +374,12 @@ CONTAINS
              write(*, *) field_double_4d
              write(*, *)
              write(*, *) "ATM: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+
              deallocate(field_double_4d)
           endif
        end if
@@ -368,6 +404,14 @@ CONTAINS
              write(*, *) field_float_1d
              write(*, *)
              write(*, *) "ATM: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+
+
+
              deallocate(field_float_1d)
           endif
 
@@ -391,6 +435,12 @@ CONTAINS
              write(*, *) field_float_2d
              write(*, *)
              write(*, *) "ATM: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+
              deallocate(field_float_2d)
           endif
 
@@ -417,6 +467,12 @@ CONTAINS
              write(*, *) field_float_3d
              write(*, *)
              write(*, *) "ATM: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+             
              deallocate(field_float_3d)
           endif
 
@@ -445,6 +501,13 @@ CONTAINS
              write(*, *) field_float_4d
              write(*, *)
              write(*, *) "ATM: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+
+             
              deallocate(field_float_4d)
           endif
        end if
