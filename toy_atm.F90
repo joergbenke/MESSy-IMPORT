@@ -87,7 +87,7 @@ CONTAINS
        integer :: len_of_dim
        character(len = 128) :: name_of_dim
     end type dimension_attr
-    type(dimension_attr) :: instance_dimension_attr
+    type(dimension_attr), allocatable, dimension(:) :: instance_dimension_attr
 
     
     comp_comm = comm
@@ -141,6 +141,9 @@ CONTAINS
        stop
     endif
 
+    ! Create list of type dimension_attr
+    allocate(instance_dimension_attr(ndim))
+    
     write(*, *)
     write(*, *) "----- ATM: Output of dimensions id, length and name -----"
     do k = 1, ndim
@@ -151,9 +154,9 @@ CONTAINS
           stop
        endif
 
-       instance_dimension_attr%number_of_dim = k
-       instance_dimension_attr%len_of_dim = len
-       instance_dimension_attr%name_of_dim = name
+       instance_dimension_attr(k)%number_of_dim = k
+       instance_dimension_attr(k)%len_of_dim = len
+       instance_dimension_attr(k)%name_of_dim = name
     
        ! read number vertices in longitude directions (vertex is midpoint of cell)
        if(index(trim(name), 'lon') /= 0) then
