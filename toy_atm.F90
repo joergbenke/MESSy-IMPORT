@@ -79,9 +79,11 @@ CONTAINS
     real(kind = 8) :: correction_value_lat = 0.0, correction_value_lon = 0.0
     real(kind = 8), allocatable, dimension(:) :: field_double_1d
     real(kind = 8), allocatable, dimension(:, :) :: field_double_2d 
+    real(kind = 8), allocatable, dimension(:, :, :) :: field_double_3d 
     real(kind = 8), allocatable, dimension(:, :, :, :) :: field_double_4d 
     real(kind = 8), allocatable, dimension(:) :: field_float_1d
     real(kind = 8), allocatable, dimension(:, :) :: field_float_2d 
+    real(kind = 8), allocatable, dimension(:, :, :) :: field_float_3d 
     real(kind = 8), allocatable, dimension(:, :, :, :) :: field_float_4d 
 
     type dimension_attr
@@ -245,6 +247,34 @@ CONTAINS
              deallocate(field_double_2d)
           endif
 
+          if(ndims == 3) then
+             write(*, *) "ATM: Type DOUBLE 3d"
+             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(3))%len_of_dim
+             allocate(field_double_3d(instance_dimension_attr(dimids(1))%len_of_dim,&
+                  instance_dimension_attr(dimids(2))%len_of_dim, &
+                  instance_dimension_attr(dimids(3))%len_of_dim))
+             write(*, *) "After allocation of field_double_4d"
+             
+             ! Get values fron variable
+             write(*, *) "ATM: Before nf90_get_var"
+             status = nf90_get_var( ncid, k, field_double_3d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** ATM: n90_get_var error *****"
+                write(*, *) "ATM: status nf90_get_var: ", status
+                stop 
+             endif
+
+             write(*, *) "field_double_4d"
+             write(*, *)
+             write(*, *) field_double_3d
+             write(*, *)
+             write(*, *) "ATM: After nf90_get_var"
+             deallocate(field_double_3d)
+          endif
+
+          
           if(ndims == 4) then
              write(*, *) "ATM: Type DOUBLE 4d"
              write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
@@ -321,9 +351,35 @@ CONTAINS
              deallocate(field_float_2d)
           endif
 
+
+          if(ndims == 3) then
+             write(*, *) "ATM: Type FLOAT 3d"
+             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(3))%len_of_dim
+             allocate(field_float_3d(instance_dimension_attr(dimids(1))%len_of_dim,&
+                  instance_dimension_attr(dimids(2))%len_of_dim, &
+                  instance_dimension_attr(dimids(3))%len_of_dim))
+             write(*, *) "After allocation"
+             
+             ! Get values fron variable
+             write(*, *) "ATM: Before nf90_get_var"
+             status = nf90_get_var( ncid, k, field_float_3d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** ATM: n90_get_var error *****"
+                write(*, *) "ATM: status nf90_get_var: ", status
+                stop 
+             endif
+
+             write(*, *) field_float_3d
+             write(*, *)
+             write(*, *) "ATM: After nf90_get_var"
+             deallocate(field_float_3d)
+          endif
+
+
           if(ndims == 4) then
              write(*, *) "ATM: Type FLOAT 4d"
-             write(*, *) "ATM: dimids(1), dimids(2), dimids(3), dimids(4): ", dimids(1), dimids(2), dimids(3), dimids(4)
              write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
              write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
              write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(3))%len_of_dim
