@@ -187,6 +187,49 @@ CONTAINS
     ! Output of the dimensions
     allocate(dimids(ndim))
 
+
+    ! Define local part of the grid
+    write(*, *)
+    write(*, *) "ATM: Before YAC_FDEF_GRID"
+!    CALL yac_fdef_grid ( &
+!         grid_name, num_vertices, num_cells, num_vertices_per_cell, &
+!         x_vertices, y_vertices, cell_to_vertex, grid_id )
+
+    cyclic = (/ 1,0/)
+    CALL yac_fdef_grid( &
+         grid_name, (/ num_vertices_lon, num_vertices_lat /), cyclic, &
+         x_vertices, y_vertices, grid_id )
+    ! Interface for yac_fdef_grid_reg2d_dble 
+
+    write(*, *) "ATM: After YAC_FDEF_GRID"
+    write(*, *)
+
+    write( grid_metadata,'(A)') attr_grid_total
+    CALL yac_fdef_grid_metadata(grid_name, grid_metadata)
+
+    ! Set global cell ids
+    CALL yac_fset_global_index(global_cell_ids, YAC_LOCATION_CELL, grid_id)
+
+    ! Define location of the actual data (on cell centers)
+    write(*, *)
+    write(*, *) "ATM: Before YAC_FDEF_POINTS"
+
+    CALL yac_fdef_points ( &
+         grid_id, (/ num_vertices_lon, num_vertices_lat /), YAC_LOCATION_CORNER, &
+         x_vertices, y_vertices, cell_point_id )
+
+!    CALL yac_fdef_points ( &
+!        grid_id, (/ num_vertices_lon-1, num_vertices_lat-1 /), YAC_LOCATION_CELL, &
+!        x_cells, y_cells, cell_point_id )
+
+    write(*, *)
+    write(*, *) "ATM: After YAC_FDEF_POINTS"
+
+    ! ! Set mask for cell centers
+    ! CALL yac_fset_mask(cell_sea_land_mask >= 0, cell_point_id)
+    
+
+    
     attr_grid_total = ''
     do k = 1, nvar
        name = ''
@@ -524,45 +567,6 @@ CONTAINS
 !       end if
 !    end do
 
-    ! Define local part of the grid
-    write(*, *)
-    write(*, *) "ATM: Before YAC_FDEF_GRID"
-!    CALL yac_fdef_grid ( &
-!         grid_name, num_vertices, num_cells, num_vertices_per_cell, &
-!         x_vertices, y_vertices, cell_to_vertex, grid_id )
-
-    cyclic = (/ 1,0/)
-    CALL yac_fdef_grid( &
-         grid_name, (/ num_vertices_lon, num_vertices_lat /), cyclic, &
-         x_vertices, y_vertices, grid_id )
-    ! Interface for yac_fdef_grid_reg2d_dble 
-
-    write(*, *) "ATM: After YAC_FDEF_GRID"
-    write(*, *)
-
-    write( grid_metadata,'(A)') attr_grid_total
-    CALL yac_fdef_grid_metadata(grid_name, grid_metadata)
-
-    ! Set global cell ids
-    CALL yac_fset_global_index(global_cell_ids, YAC_LOCATION_CELL, grid_id)
-
-    ! Define location of the actual data (on cell centers)
-    write(*, *)
-    write(*, *) "ATM: Before YAC_FDEF_POINTS"
-
-    CALL yac_fdef_points ( &
-         grid_id, (/ num_vertices_lon, num_vertices_lat /), YAC_LOCATION_CORNER, &
-         x_vertices, y_vertices, cell_point_id )
-
-!    CALL yac_fdef_points ( &
-!        grid_id, (/ num_vertices_lon-1, num_vertices_lat-1 /), YAC_LOCATION_CELL, &
-!        x_cells, y_cells, cell_point_id )
-
-    write(*, *)
-    write(*, *) "ATM: After YAC_FDEF_POINTS"
-
-    ! ! Set mask for cell centers
-    ! CALL yac_fset_mask(cell_sea_land_mask >= 0, cell_point_id)
 
     ! Define fields
     CALL define_fields( &
