@@ -79,6 +79,7 @@ CONTAINS
     real(kind = 8) :: correction_value_lat = 0.0, correction_value_lon = 0.0
     real(kind = 8), allocatable, dimension(:) :: field_double_1d
     real(kind = 8), allocatable, dimension(:, :) :: field_double_2d 
+    real(kind = 8), allocatable, dimension(:, :, :, :) :: field_double_4d 
     real(kind = 8), allocatable, dimension(:) :: field_float_1d
     real(kind = 8), allocatable, dimension(:, :) :: field_float_2d 
     real(kind = 8), allocatable, dimension(:, :, :, :) :: field_float_4d 
@@ -198,16 +199,14 @@ CONTAINS
        write(*, *) "ATM: Results of nf90_inquire_varibale call: ", ndims, ", ", dimids, ", ", natts
 
        if(xtype == NF90_DOUBLE) THEN
-          write(*, *) "Type DOUBLE"
           if(ndims == 1) then
-             write(*, *) "dimids(1): ", dimids(1)
-!             instance_dimension_attr(dimids(1))%len_of_dim = dimids(1)
-             write(*, *) "instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
-             write(*, *) "field_double_1d(instance_dimension_attr%len_of_dim(dimids(1))): ", &
-                  field_double_1d(instance_dimension_attr(dimids(1))%len_of_dim)
+             write(*, *) "ATM: Type FLOAT 1d"
+             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
              allocate(field_double_1d(instance_dimension_attr(dimids(1))%len_of_dim))
-
-             ! Get values fron variable 
+             write(*, *) "After allocation of field_double_1d"
+             
+             ! Get values fron variable
+             write(*, *) "ATM: Before nf90_get_var"
              status = nf90_get_var( ncid, k, field_double_1d ) 
              if (status /= nf90_noerr) then
                 write(*, *) "***** ATM: n90_get_var error *****"
@@ -215,17 +214,64 @@ CONTAINS
                 stop 
              endif
 
+             write(*, *) "field_double_1d"
+             write(*, *)
+             write(*, *) field_double_1d
+             write(*, *)
+             write(*, *) "ATM: After nf90_get_var"
+             deallocate(field_double_1d)
           endif
+
           if(ndims == 2) then
- !            allocate(field_double_2d(instance_dimension_attr%len_of_dim(dimids(1))), &
- !                 instance_dimension_attr%len_of_dim(dimids(1)))
-             ! Get values fron variable 
+             write(*, *) "ATM: Type FLOAT 2d"
+             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
+             allocate(field_double_2d(instance_dimension_attr(dimids(1))%len_of_dim, instance_dimension_attr(dimids(2))%len_of_dim))
+             write(*, *) "After allocation of field_double_2d"
+             
+             ! Get values fron variable
+             write(*, *) "ATM: Before nf90_get_var"
              status = nf90_get_var( ncid, k, field_double_2d ) 
              if (status /= nf90_noerr) then
                 write(*, *) "***** ATM: n90_get_var error *****"
                 write(*, *) "ATM: status nf90_get_var: ", status
                 stop 
              endif
+
+             write(*, *) "field_double_2d"
+             write(*, *) field_double_2d
+             write(*, *)
+             write(*, *) "ATM: After nf90_get_var"
+             deallocate(field_double_2d)
+          endif
+
+          if(ndims == 4) then
+             write(*, *) "ATM: Type DOUBLE 4d"
+             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(3))%len_of_dim
+             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(4))%len_of_dim
+             allocate(field_double_4d(instance_dimension_attr(dimids(1))%len_of_dim,&
+                  instance_dimension_attr(dimids(2))%len_of_dim, &
+                  instance_dimension_attr(dimids(3))%len_of_dim, &
+                  instance_dimension_attr(dimids(4))%len_of_dim))
+             write(*, *) "After allocation of field_double_4d"
+             
+             ! Get values fron variable
+             write(*, *) "ATM: Before nf90_get_var"
+             status = nf90_get_var( ncid, k, field_double_4d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** ATM: n90_get_var error *****"
+                write(*, *) "ATM: status nf90_get_var: ", status
+                stop 
+             endif
+
+             write(*, *) "field_double_4d"
+             write(*, *)
+             write(*, *) field_double_4d
+             write(*, *)
+             write(*, *) "ATM: After nf90_get_var"
+             deallocate(field_double_4d)
           endif
        end if
        
@@ -302,9 +348,6 @@ CONTAINS
              write(*, *) "ATM: After nf90_get_var"
              deallocate(field_float_4d)
           endif
-
-          
-
        end if
 
        
