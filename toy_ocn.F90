@@ -55,47 +55,86 @@ MODULE toy_ocn
 CONTAINS
 
   SUBROUTINE main_ocn(comm)
-
     CHARACTER(LEN=max_char_length), PARAMETER :: grid_filename = "grids/GEIA_MPIC1.0_X_bioland_NH3_2000-2000.nc"
     character(len = 1000) :: name
     character(len = 5000) :: grid_metadata
+    character(len = 5000) :: field_metadata
 
     integer, intent(in) :: comm
     ! netCDF file identifier
     integer :: ncid
     ! Number of dimensions, variables, attributes and time steps in netCDF file
     integer :: ndim, nvar, natt, k_un
-    integer :: natts, xtype, ndims
     ! number 
     integer :: k, len
-    integer :: num_vertices_lon, num_vertices_lat
+    integer :: num_vertices_lon, num_vertices_lat, num_vertices
+    integer :: natts, xtype, ndims
     integer :: status
     integer, dimension(2) :: cyclic = (/1, 0 /)
     integer, allocatable, dimension(:) :: dimids
 
-    real :: correction_value_lat = 0.0, correction_value_lon = 0.0
+    real(kind = 8) :: correction_value_lat = 0.0, correction_value_lon = 0.0
+    real(kind = 8), allocatable, dimension(:) :: field_double_1d
+    real(kind = 8), allocatable, dimension(:, :) :: field_double_2d 
+    real(kind = 8), allocatable, dimension(:, :, :) :: field_double_3d 
+    real(kind = 8), allocatable, dimension(:, :, :, :) :: field_double_4d 
+    real(kind = 8), allocatable, dimension(:) :: field_float_1d
+    real(kind = 8), allocatable, dimension(:, :) :: field_float_2d 
+    real(kind = 8), allocatable, dimension(:, :, :) :: field_float_3d 
+    real(kind = 8), allocatable, dimension(:, :, :, :) :: field_float_4d 
+
+    INTEGER :: point_id
+    integer :: collection_size = 1
+    integer :: def_field = -1
+    INTEGER, PARAMETER :: num_point_ids = 1
+    INTEGER :: point_ids(num_point_ids)
+    CHARACTER(LEN=max_char_length), PARAMETER :: timestep = "1"
+    INTEGER, PARAMETER :: timestep_unit = YAC_TIME_UNIT_SECOND
+
+    
+    type dimension_attr
+       integer :: number_of_dim
+       integer :: len_of_dim
+       character(len = 1000) :: name_of_dim
+    end type dimension_attr
+    type(dimension_attr), allocatable, dimension(:) :: instance_dimension_attr
+
+    def_field = -1
+    point_ids(1) = point_id
+
     
     comp_comm = comm
 
     ! Read coupling configuration file
     CALL yac_fread_config_yaml(yaml_filename)
 
-    ! Define local component
+    ! Define local component and add metadata
     CALL yac_fdef_comp(comp_name, comp_id)
-
-    ! Retrieve communicator for OCN component
+    call yac_fdef_component_metadata(comp_name, "Component MESSy IMPORT Server" )
+    
+    ! Retrieve communicator for ATM component
     CALL yac_fget_comp_comm(comp_id, comp_comm)
 
-    ! Get MPI rank
     CALL MPI_Comm_rank(comp_comm, comp_rank, ierror)
+
+    ! Read the grid and distribute it among all ATM processes
+    !CALL read_icon_grid( &
+    !     grid_filename, comp_comm, cell_to_vertex, x_vertices, &
+    !     y_vertices, x_cells, y_cells, cell_sea_land_mask, &
+    !     global_cell_id)
+    !    num_vertices = SIZE(x_vertices)
+    !    num_cells = SIZE(x_cells)
+    !    num_vertices_per_cell = SIZE(cell_to_vertex, 1)
 
     !
     ! From here read netCDF file
     !
+
+
     
     ! Open netCDF file
     write(*, *)
-    write(*, *) "----- OCN: Open ocean netCDF file -----"
+    write(*, *) "----- OCNN: Open ocean netCDF file -----"
     status = nf90_open(trim(grid_filename), nf90_nowrite, ncid)
     if(status /= nf90_noerr) then
        write(*, *) 'OCN: could not open (ocean): ', grid_filename
@@ -115,6 +154,9 @@ CONTAINS
        stop
     endif
 
+    ! Create list of type dimension_attr
+    allocate(instance_dimension_attr(ndim))
+    
     write(*, *)
     write(*, *) "----- OCN: Output of dimensions id, length and name -----"
     do k = 1, ndim
@@ -125,6 +167,10 @@ CONTAINS
           stop
        endif
 
+       instance_dimension_attr(k)%number_of_dim = k
+       instance_dimension_attr(k)%len_of_dim = len
+       instance_dimension_attr(k)%name_of_dim = name
+    
        ! read number vertices in longitude directions (vertex is midpoint of cell)
        if(index(trim(name), 'lon') /= 0) then
           num_vertices_lon = len
@@ -149,7 +195,61 @@ CONTAINS
 
     ! Output of the dimensions
     allocate(dimids(ndim))
+    allocate(x_vertices(num_vertices_lon))
+    allocate(y_vertices(num_vertices_lat))
 
+    !    call read_grid_from_netcdf(trim(grid_filename), num_vertices_lon, num_vertices_lat, num_cells, &
+    !         x_vertices, y_vertices, x_cells, y_cells, attr_grid_total)
+    num_vertices_per_cell = 4
+
+    ! Allocate and fill the arry cell_to_vertex with the vertices of the elements
+!    allocate(cell_to_vertex(num_cells, 4))
+    allocate(global_cell_ids(num_cells))
+
+    ! Define local part of the grid
+    write(*, *)
+    write(*, *) "OCN: Before YAC_FDEF_GRID"
+!    CALL yac_fdef_grid ( &
+!         grid_name, num_vertices, num_cells, num_vertices_per_cell, &
+!         x_vertices, y_vertices, cell_to_vertex, grid_id )
+
+    cyclic = (/ 1,0/)
+    CALL yac_fdef_grid( &
+         grid_name, (/ num_vertices_lon, num_vertices_lat /), cyclic, &
+         x_vertices, y_vertices, grid_id )
+    ! Interface for yac_fdef_grid_reg2d_dble 
+
+    write(*, *) "OCN: After YAC_FDEF_GRID"
+    write(*, *)
+
+    write( grid_metadata,'(A)') attr_grid_total
+    CALL yac_fdef_grid_metadata(grid_name, grid_metadata)
+
+    ! Set global cell ids
+    CALL yac_fset_global_index(global_cell_ids, YAC_LOCATION_CELL, grid_id)
+
+    ! Define location of the actual data (on cell centers)
+    write(*, *)
+    write(*, *) "OCN: Before YAC_FDEF_POINTS"
+
+    CALL yac_fdef_points ( &
+         grid_id, (/ num_vertices_lon, num_vertices_lat /), YAC_LOCATION_CORNER, &
+         x_vertices, y_vertices, cell_point_id )
+
+    write(*,*) "cell_point_id: ", cell_point_id
+    
+!    CALL yac_fdef_points ( &
+!        grid_id, (/ num_vertices_lon-1, num_vertices_lat-1 /), YAC_LOCATION_CELL, &
+!        x_cells, y_cells, cell_point_id )
+
+    write(*, *)
+    write(*, *) "OCN: After YAC_FDEF_POINTS"
+
+    ! ! Set mask for cell centers
+    ! CALL yac_fset_mask(cell_sea_land_mask >= 0, cell_point_id)
+    
+
+    
     attr_grid_total = ''
     do k = 1, nvar
        name = ''
@@ -160,8 +260,290 @@ CONTAINS
           stop
        endif
 
+       write(*, *) "OCN: Results of nf90_inquire_varibale call: ", ncid, ", ", k, ", ", trim(name), ", ", xtype, ", "
+       write(*, *) "OCN: Results of nf90_inquire_varibale call: ", ndims, ", ", dimids, ", ", natts
+
+       if(xtype == NF90_DOUBLE) THEN
+          if(ndims == 1) then
+             write(*, *) "OCN: Type FLOAT 1d"
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
+             allocate(field_double_1d(instance_dimension_attr(dimids(1))%len_of_dim))
+             write(*, *) "After allocation of field_double_1d"
+             
+             ! Get values fron variable
+             write(*, *) "OCN: Before nf90_get_var"
+             status = nf90_get_var( ncid, k, field_double_1d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
+                stop 
+             endif
+
+             write(*, *) "field_double_1d"
+             write(*, *)
+             write(*, *) field_double_1d
+             write(*, *)
+             write(*, *) "OCN: After nf90_get_var"
+
+             ! Define field
+             write(*, *) "Before yac_fdef_field"
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+             write(*, *) "After yac_fdef_field"
+
+             write(*, *) "Before yac_fdef_field_metadata"
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
+             write(*, *) "After yac_fdef_field_metadata"
+
+             deallocate(field_double_1d)
+          endif
+
+          if(ndims == 2) then
+             write(*, *) "OCN: Type FLOAT 2d"
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
+             allocate(field_double_2d(instance_dimension_attr(dimids(1))%len_of_dim, instance_dimension_attr(dimids(2))%len_of_dim))
+             write(*, *) "After allocation of field_double_2d"
+             
+             ! Get values fron variable
+             write(*, *) "OCN: Before nf90_get_var"
+             status = nf90_get_var( ncid, k, field_double_2d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
+                stop 
+             endif
+
+             write(*, *) "field_double_2d"
+             write(*, *) field_double_2d
+             write(*, *)
+             write(*, *) "OCN: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
+
+             deallocate(field_double_2d)
+          endif
+
+          if(ndims == 3) then
+             write(*, *) "OCN: Type DOUBLE 3d"
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(3))%len_of_dim
+             allocate(field_double_3d(instance_dimension_attr(dimids(1))%len_of_dim,&
+                  instance_dimension_attr(dimids(2))%len_of_dim, &
+                  instance_dimension_attr(dimids(3))%len_of_dim))
+             write(*, *) "After allocation of field_double_4d"
+             
+             ! Get values fron variable
+             write(*, *) "OCN: Before nf90_get_var"
+             status = nf90_get_var( ncid, k, field_double_3d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
+                stop 
+             endif
+
+             write(*, *) "field_double_4d"
+             write(*, *)
+             write(*, *) field_double_3d
+             write(*, *)
+             write(*, *) "OCN: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
+
+             deallocate(field_double_3d)
+          endif
+
+          
+          if(ndims == 4) then
+             write(*, *) "OCN: Type DOUBLE 4d"
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(3))%len_of_dim
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(4))%len_of_dim
+             allocate(field_double_4d(instance_dimension_attr(dimids(1))%len_of_dim,&
+                  instance_dimension_attr(dimids(2))%len_of_dim, &
+                  instance_dimension_attr(dimids(3))%len_of_dim, &
+                  instance_dimension_attr(dimids(4))%len_of_dim))
+             write(*, *) "After allocation of field_double_4d"
+             
+             ! Get values fron variable
+             write(*, *) "OCN: Before nf90_get_var"
+             status = nf90_get_var( ncid, k, field_double_4d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
+                stop 
+             endif
+
+             write(*, *) "field_double_4d"
+             write(*, *)
+             write(*, *) field_double_4d
+             write(*, *)
+             write(*, *) "OCN: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
+
+             deallocate(field_double_4d)
+          endif
+       end if
+       
+       if(xtype == NF90_FLOAT) THEN
+          if(ndims == 1) then
+             write(*, *) "OCN: Type FLOAT 1d"
+             write(*, *) "OCN: dimids(1): ", dimids(1)
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
+             allocate(field_float_1d(instance_dimension_attr(dimids(1))%len_of_dim))
+             write(*, *) "After allocation"
+             
+             ! Get values fron variable
+             write(*, *) "OCN: Before nf90_get_var"
+             status = nf90_get_var( ncid, k, field_float_1d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
+                stop 
+             endif
+
+             write(*, *) field_float_1d
+             write(*, *)
+             write(*, *) "OCN: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+             write(*, *) "After yac_fdef_field dim = 1"
+
+             write(*, *) "Before yac_fdef_field_metadata dim = 1"
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
+
+             deallocate(field_float_1d)
+          endif
+
+          if(ndims == 2) then
+             write(*, *) "OCN: Type FLOAT 2d"
+             write(*, *) "OCN: dimids(1), dimids(2): ", dimids(1), dimids(2)
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
+             allocate(field_float_2d(instance_dimension_attr(dimids(1))%len_of_dim, instance_dimension_attr(dimids(2))%len_of_dim))
+             write(*, *) "After allocation"
+             
+             ! Get values fron variable
+             write(*, *) "OCN: Before nf90_get_var"
+             status = nf90_get_var( ncid, k, field_float_2d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
+                stop 
+             endif
+
+             write(*, *) field_float_2d
+             write(*, *)
+             write(*, *) "OCN: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+             write(*, *) "After yac_fdef_field dim = 2"
+
+             write(*, *) "Before yac_fdef_field_metadata dim = 2"
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
+
+             deallocate(field_float_2d)
+          endif
+
+
+          if(ndims == 3) then
+             write(*, *) "OCN: Type FLOAT 3d"
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(3))%len_of_dim
+             allocate(field_float_3d(instance_dimension_attr(dimids(1))%len_of_dim,&
+                  instance_dimension_attr(dimids(2))%len_of_dim, &
+                  instance_dimension_attr(dimids(3))%len_of_dim))
+             write(*, *) "After allocation"
+             
+             ! Get values fron variable
+             write(*, *) "OCN: Before nf90_get_var"
+             status = nf90_get_var( ncid, k, field_float_3d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
+                stop 
+             endif
+
+             write(*, *) field_float_3d
+             write(*, *)
+             write(*, *) "OCN: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+             write(*, *) "After yac_fdef_field dim =3"
+
+             write(*, *) "Before yac_fdef_field_metadata dim = 3"
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
+             
+             deallocate(field_float_3d)
+          endif
+
+
+          if(ndims == 4) then
+             write(*, *) "OCN: Type FLOAT 4d"
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(3))%len_of_dim
+             write(*, *) "OCN: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(4))%len_of_dim
+             allocate(field_float_4d(instance_dimension_attr(dimids(1))%len_of_dim,&
+                  instance_dimension_attr(dimids(2))%len_of_dim, &
+                  instance_dimension_attr(dimids(3))%len_of_dim, &
+                  instance_dimension_attr(dimids(4))%len_of_dim))
+             write(*, *) "After allocation"
+             
+             ! Get values fron variable
+             write(*, *) "OCN: Before nf90_get_var"
+             status = nf90_get_var( ncid, k, field_float_4d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
+                stop 
+             endif
+
+             write(*, *) field_float_4d
+             write(*, *)
+             write(*, *) "OCN: After nf90_get_var"
+
+             ! Define field
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+             write(*, *) "After yac_fdef_field dim = 4"
+
+             write(*, *) "Before yac_fdef_field_metadata dim = 4"
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
+             
+             deallocate(field_float_4d)
+          endif
+       end if
+
+       
        if(index(trim(name), 'lon') /= 0) then
-          allocate(x_vertices(num_vertices_lon))
           
           status = nf90_get_var( ncid, k, x_cells ) !(/ 1,1,1 /) )
           if (status /= nf90_noerr) then
@@ -194,10 +576,12 @@ CONTAINS
              write(*, *) "OCN: attr_grid_total (lon; from call): ", trim(attr_grid_total)
              write(*, *)
           endif
+
+          cycle
        end if
 
        if(index(trim(name), 'lat') /= 0) then
-          allocate(y_vertices(num_vertices_lat))
+!          allocate(y_vertices(num_vertices_lat))
 
           status = nf90_get_var( ncid, k, y_cells ) 
           if (status /= nf90_noerr) then
@@ -229,7 +613,9 @@ CONTAINS
              write(*, *) "OCN: attr_grid_total (lat; from call): ", trim(attr_grid_total)
              write(*, *)
           endif
+          cycle
        end if
+
     enddo
 
 
@@ -249,46 +635,24 @@ CONTAINS
     ! End of reading netCDF file
     !
 
+
     
-    ! Define local part of the grid
-    !    call read_grid_from_netcdf(trim(grid_filename), num_vertices_lon, num_vertices_lat, num_cells, &
-    !         x_vertices, y_vertices, x_cells, y_cells, attr_grid_total)
-    num_vertices_per_cell = 4
+    ! Create the numerbing of the cells (column wise; from bottom totop)
+!    do i = 1, num_cells
+!       if(i < num_vertices_lat) then
+!          cell_to_vertex(i, 1) = 1 + (i - 1)
+!          cell_to_vertex(i, 2) = 2 + (i - 1) 
+!          cell_to_vertex(i, 3) = (1 + num_vertices_lat) + (i - 1)
+!          cell_to_vertex(i, 4) = (2 + num_vertices_lat) + (i - 1)
+!       else
+!          cell_to_vertex(i, 1) = cell_to_vertex(i - (num_vertices_lat - 1), 3)
+!          cell_to_vertex(i, 2) = cell_to_vertex(i - (num_vertices_lat - 1), 4) 
+!          cell_to_vertex(i, 3) = cell_to_vertex(i, 1) + num_vertices_lat
+!          cell_to_vertex(i, 4) = cell_to_vertex(i, 2) + num_vertices_lat
+!       end if
+!    end do
 
-
-    ! Define the grid for YAC
-    cyclic = (/ 1,0/)
-    CALL yac_fdef_grid( &
-         grid_name, (/ num_vertices_lon, num_vertices_lat /), cyclic, &
-         x_vertices, y_vertices, grid_id )
-    ! Interface for yac_fdef_grid_reg2d_dble 
-
-    ! Define location of the actual data (on cell centers)
-    !    write(*, *)
-    !    write(*, *) "OCN: Before YAC_FDEF_POINTS"
-
-    write( grid_metadata,'(A)') attr_grid_total
-    CALL yac_fdef_grid_metadata(grid_name, grid_metadata) 
-!    call yac_fdef_field_metadata(comp_name, grid_name, field_name, 
-
-    ! Set global cell ids
-    allocate(global_cell_ids(num_cells))
-    CALL yac_fset_global_index(global_cell_ids, YAC_LOCATION_CELL, grid_id)
-
-    CALL yac_fdef_points ( &
-         grid_id, (/ num_vertices_lon, num_vertices_lat /), YAC_LOCATION_CORNER, &
-         x_vertices, y_vertices, cell_point_id )
-
-!    CALL yac_fdef_points ( &
-!         grid_id, (/ num_vertices_lon-1, num_vertices_lat-1 /), YAC_LOCATION_CELL, &
-!         x_cells, y_cells, cell_point_id )
-
-!    write(*, *)
-!    write(*, *) "OCN: After YAC_FDEF_POINTS"
-
-    ! Set mask for cell centers
-    ! CALL yac_fset_mask(cell_sea_land_mask < 0, cell_point_id)
-
+ 
     ! Define fields
     CALL define_fields( &
          comp_id, cell_point_id, field_taux_id, field_tauy_id, field_sfwflx_id, &

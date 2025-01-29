@@ -62,6 +62,7 @@ CONTAINS
     CHARACTER(LEN=max_char_length), PARAMETER :: grid_filename = "grids/GEIA_MPIC1.0_X_bioland_NH3_2000-2000.nc"
     character(len = 1000) :: name
     character(len = 5000) :: grid_metadata
+    character(len = 5000) :: field_metadata
 
     integer, intent(in) :: comm
     ! netCDF file identifier
@@ -198,7 +199,16 @@ CONTAINS
 
     ! Output of the dimensions
     allocate(dimids(ndim))
+    allocate(x_vertices(num_vertices_lon))
+    allocate(y_vertices(num_vertices_lat))
 
+    !    call read_grid_from_netcdf(trim(grid_filename), num_vertices_lon, num_vertices_lat, num_cells, &
+    !         x_vertices, y_vertices, x_cells, y_cells, attr_grid_total)
+    num_vertices_per_cell = 4
+
+    ! Allocate and fill the arry cell_to_vertex with the vertices of the elements
+    allocate(cell_to_vertex(num_cells, 4))
+    allocate(global_cell_ids(num_cells))
 
     ! Define local part of the grid
     write(*, *)
@@ -230,6 +240,8 @@ CONTAINS
          grid_id, (/ num_vertices_lon, num_vertices_lat /), YAC_LOCATION_CORNER, &
          x_vertices, y_vertices, cell_point_id )
 
+    write(*,*) "cell_point_id: ", cell_point_id
+    
 !    CALL yac_fdef_points ( &
 !        grid_id, (/ num_vertices_lon-1, num_vertices_lat-1 /), YAC_LOCATION_CELL, &
 !        x_cells, y_cells, cell_point_id )
@@ -278,9 +290,15 @@ CONTAINS
              write(*, *) "ATM: After nf90_get_var"
 
              ! Define field
+             write(*, *) "Before yac_fdef_field"
              CALL yac_fdef_field ( &
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
+             write(*, *) "After yac_fdef_field"
+
+             write(*, *) "Before yac_fdef_field_metadata"
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
+             write(*, *) "After yac_fdef_field_metadata"
 
              deallocate(field_double_1d)
           endif
@@ -310,6 +328,7 @@ CONTAINS
              CALL yac_fdef_field ( &
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
 
              deallocate(field_double_2d)
           endif
@@ -343,6 +362,7 @@ CONTAINS
              CALL yac_fdef_field ( &
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
 
              deallocate(field_double_3d)
           endif
@@ -379,6 +399,7 @@ CONTAINS
              CALL yac_fdef_field ( &
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
 
              deallocate(field_double_4d)
           endif
@@ -409,8 +430,10 @@ CONTAINS
              CALL yac_fdef_field ( &
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
+             write(*, *) "After yac_fdef_field dim = 1"
 
-
+             write(*, *) "Before yac_fdef_field_metadata dim = 1"
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
 
              deallocate(field_float_1d)
           endif
@@ -440,6 +463,10 @@ CONTAINS
              CALL yac_fdef_field ( &
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
+             write(*, *) "After yac_fdef_field dim = 2"
+
+             write(*, *) "Before yac_fdef_field_metadata dim = 2"
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
 
              deallocate(field_float_2d)
           endif
@@ -472,6 +499,10 @@ CONTAINS
              CALL yac_fdef_field ( &
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
+             write(*, *) "After yac_fdef_field dim =3"
+
+             write(*, *) "Before yac_fdef_field_metadata dim = 3"
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
              
              deallocate(field_float_3d)
           endif
@@ -506,7 +537,10 @@ CONTAINS
              CALL yac_fdef_field ( &
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
+             write(*, *) "After yac_fdef_field dim = 4"
 
+             write(*, *) "Before yac_fdef_field_metadata dim = 4"
+             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
              
              deallocate(field_float_4d)
           endif
@@ -514,7 +548,6 @@ CONTAINS
 
        
        if(index(trim(name), 'lon') /= 0) then
-          allocate(x_vertices(num_vertices_lon))
           
           status = nf90_get_var( ncid, k, x_cells ) !(/ 1,1,1 /) )
           if (status /= nf90_noerr) then
@@ -552,7 +585,7 @@ CONTAINS
        end if
 
        if(index(trim(name), 'lat') /= 0) then
-          allocate(y_vertices(num_vertices_lat))
+!          allocate(y_vertices(num_vertices_lat))
 
           status = nf90_get_var( ncid, k, y_cells ) 
           if (status /= nf90_noerr) then
@@ -607,13 +640,6 @@ CONTAINS
     !
 
 
-    !    call read_grid_from_netcdf(trim(grid_filename), num_vertices_lon, num_vertices_lat, num_cells, &
-!         x_vertices, y_vertices, x_cells, y_cells, attr_grid_total)
-    num_vertices_per_cell = 4
-
-    ! Allocate and fill the arry cell_to_vertex with the vertices of the elements
-    allocate(cell_to_vertex(num_cells, 4))
-    allocate(global_cell_ids(num_cells))
     
     ! Create the numerbing of the cells (column wise; from bottom totop)
 !    do i = 1, num_cells
