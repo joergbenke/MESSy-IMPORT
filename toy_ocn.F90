@@ -100,8 +100,6 @@ CONTAINS
 
     def_field = -1
     point_ids(1) = point_id
-
-    
     comp_comm = comm
 
     ! Read coupling configuration file
@@ -110,7 +108,7 @@ CONTAINS
     ! Define local component and add metadata
     CALL yac_fdef_comp(comp_name, comp_id)
 
-    comp_metadata = "Component MESSy IMPORT Server"
+    write( comp_metadata, '(A)')  "Component MESSy IMPORT Client" 
     call yac_fdef_component_metadata(comp_name, comp_metadata )
     
     ! Retrieve communicator for ATM component
