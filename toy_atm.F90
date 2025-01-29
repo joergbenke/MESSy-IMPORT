@@ -61,8 +61,7 @@ CONTAINS
 
     CHARACTER(LEN=max_char_length), PARAMETER :: grid_filename = "grids/GEIA_MPIC1.0_X_bioland_NH3_2000-2000.nc"
     character(len = 1000) :: name
-    character(len = 5000) :: grid_metadata
-    character(len = 5000) :: field_metadata
+    character(len = 5000) :: grid_metadata, field_metadata, comp_metadata
 
     integer, intent(in) :: comm
     ! netCDF file identifier
@@ -114,7 +113,9 @@ CONTAINS
 
     ! Define local component and add metadata
     CALL yac_fdef_comp(comp_name, comp_id)
-    call yac_fdef_component_metadata(comp_name, "Component MESSy IMPORT Server" )
+
+    comp_metadata = "Component MESSy IMPORT Server" 
+    call yac_fdef_component_metadata(comp_name, comp_metadata)
     
     ! Retrieve communicator for ATM component
     CALL yac_fget_comp_comm(comp_id, comp_comm)
