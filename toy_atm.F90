@@ -198,6 +198,7 @@ CONTAINS
     ! Now correction to number of vertices if vertex is on a real node and not in cell center
     num_vertices_lon = num_vertices_lon + 1
     num_vertices_lat = num_vertices_lat + 1 
+    num_vertices = num_vertices_lon * num_vertices_lat
 
     ! Allocate vector for x and y vertices
     allocate(x_vertices(num_vertices_lon))
@@ -421,10 +422,8 @@ CONTAINS
                   timestep, timestep_unit, def_field)
              write(*, *) "After yac_fdef_field dim = 1"
 
-             write(*, *) "Before yac_fdef_field_metadata dim = 1"
-             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
-
              deallocate(field_float_1d)
+
           endif
 
           if(ndims == 2) then
@@ -453,11 +452,6 @@ CONTAINS
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
              write(*, *) "After yac_fdef_field dim = 2"
-
-             write(*, *) "Before yac_fdef_field_metadata dim = 2"
-             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
-
-             deallocate(field_float_2d)
           endif
 
 
@@ -481,7 +475,6 @@ CONTAINS
              endif
 
              write(*, *) field_float_3d
-             write(*, *)
              write(*, *) "ATM: After nf90_get_var"
 
              ! Define field
@@ -489,11 +482,6 @@ CONTAINS
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
              write(*, *) "After yac_fdef_field dim =3"
-
-             write(*, *) "Before yac_fdef_field_metadata dim = 3"
-             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
-             
-             deallocate(field_float_3d)
           endif
 
 
@@ -519,7 +507,6 @@ CONTAINS
              endif
 
              write(*, *) field_float_4d
-             write(*, *)
              write(*, *) "ATM: After nf90_get_var"
 
              ! Define field
@@ -528,11 +515,16 @@ CONTAINS
                   timestep, timestep_unit, def_field)
              write(*, *) "After yac_fdef_field dim = 4"
 
-             write(*, *) "Before yac_fdef_field_metadata dim = 4"
-             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
-             
              deallocate(field_float_4d)
+
           endif
+
+          ! Define fields metadata
+          write(*, *) "ATM: Before yac_fdef_field_metadata"
+          write(field_metadata, *) trim(name)
+          call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
+          write(*, *) "ATM: After yac_fdef_field_metadata"
+
        end if
 
        
@@ -611,10 +603,6 @@ CONTAINS
 
     enddo
 
-
-! Allocate and fill the vertex arrays (for longitude and lattitude
-    num_vertices = num_vertices_lon * num_vertices_lat
-
     ! Output of the attributes
     if(natt > 0) then
        write(*, *) '==== ATM: global attributes ===='
@@ -628,22 +616,6 @@ CONTAINS
     ! End of reading netCDF file
     !
 
-
-    
-    ! Create the numerbing of the cells (column wise; from bottom totop)
-!    do i = 1, num_cells
-!       if(i < num_vertices_lat) then
-!          cell_to_vertex(i, 1) = 1 + (i - 1)
-!          cell_to_vertex(i, 2) = 2 + (i - 1) 
-!          cell_to_vertex(i, 3) = (1 + num_vertices_lat) + (i - 1)
-!          cell_to_vertex(i, 4) = (2 + num_vertices_lat) + (i - 1)
-!       else
-!          cell_to_vertex(i, 1) = cell_to_vertex(i - (num_vertices_lat - 1), 3)
-!          cell_to_vertex(i, 2) = cell_to_vertex(i - (num_vertices_lat - 1), 4) 
-!          cell_to_vertex(i, 3) = cell_to_vertex(i, 1) + num_vertices_lat
-!          cell_to_vertex(i, 4) = cell_to_vertex(i, 2) + num_vertices_lat
-!       end if
-!    end do
 
 
     ! Define fields
