@@ -236,6 +236,9 @@ CONTAINS
          x_vertices, y_vertices, cell_point_id )
 
     write(*,*) "cell_point_id: ", cell_point_id
+
+    point_id = cell_point_id
+    point_ids(1) = point_id
     
 !    CALL yac_fdef_points ( &
 !        grid_id, (/ num_vertices_lon-1, num_vertices_lat-1 /), YAC_LOCATION_CELL, &

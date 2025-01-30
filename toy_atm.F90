@@ -103,7 +103,6 @@ CONTAINS
     type(dimension_attr), allocatable, dimension(:) :: instance_dimension_attr
 
     def_field = -1
-    point_ids(1) = point_id
     comp_comm = comm
 
     ! Read coupling configuration file
@@ -238,8 +237,11 @@ CONTAINS
          x_vertices, y_vertices, cell_point_id )
 
     write(*,*) "cell_point_id: ", cell_point_id
-    
-!    CALL yac_fdef_points ( &
+
+    point_id = cell_point_id
+    point_ids(1) = point_id
+
+    !    CALL yac_fdef_points ( &
 !        grid_id, (/ num_vertices_lon-1, num_vertices_lat-1 /), YAC_LOCATION_CELL, &
 !        x_cells, y_cells, cell_point_id )
 
