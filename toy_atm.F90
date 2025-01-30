@@ -106,7 +106,6 @@ CONTAINS
     end type dimension_attr
     type(dimension_attr), allocatable, dimension(:) :: list_dimension_attr
 
-    def_field = -1
     comp_comm = comm
 
     ! Read coupling configuration file
@@ -238,15 +237,14 @@ CONTAINS
     CALL yac_fdef_points ( &
          grid_id, (/ num_vertices_lon, num_vertices_lat /), YAC_LOCATION_CORNER, &
          x_vertices, y_vertices, cell_point_id )
-
     write(*,*) "cell_point_id: ", cell_point_id
 
     point_id = cell_point_id
     point_ids(1) = point_id
 
     !    CALL yac_fdef_points ( &
-!        grid_id, (/ num_vertices_lon-1, num_vertices_lat-1 /), YAC_LOCATION_CELL, &
-!        x_cells, y_cells, cell_point_id )
+    !        grid_id, (/ num_vertices_lon-1, num_vertices_lat-1 /), YAC_LOCATION_CELL, &
+    !        x_cells, y_cells, cell_point_id )
 
     write(*, *)
     write(*, *) "ATM: After YAC_FDEF_POINTS"
@@ -265,12 +263,12 @@ CONTAINS
           stop
        endif
 
-       write(*, *) "ATM: Results of nf90_inquire_varibale call: ", ncid, ", ", k, ", ", trim(name), ", ", xtype, ", "
-       write(*, *) "ATM: Results of nf90_inquire_varibale call: ", ndims, ", ", dimids, ", ", natts
+       write(*, *) "ATM: Results of nf90_inquire_variable call: ", ncid, ", ", k, ", ", trim(name), ", ", xtype, ", "
+       write(*, *) "ATM: Results of nf90_inquire_variable call: ", ndims, ", ", dimids, ", ", natts
 
        if(xtype == NF90_DOUBLE) THEN
           if(ndims == 1) then
-             write(*, *) "ATM: Type FLOAT 1d"
+             write(*, *) "ATM: Type DOUBLE 1d"
              write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
              allocate(field_double_1d(list_dimension_attr(dimids(1))%len_of_dim))
              write(*, *) "After allocation of field_double_1d"
@@ -284,24 +282,17 @@ CONTAINS
                 stop 
              endif
 
-             write(*, *) "field_double_1d"
-             write(*, *)
+             ! Output of field
+             write(*, *) "ATM: field_double_1d"
              write(*, *) field_double_1d
-             write(*, *)
              write(*, *) "ATM: After nf90_get_var"
 
              ! Define field
-             write(*, *) "Before yac_fdef_field"
+             write(*, *) "ATM Before yac_fdef_field"
              CALL yac_fdef_field ( &
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
              write(*, *) "After yac_fdef_field"
-
-             write(*, *) "Before yac_fdef_field_metadata"
-             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
-             write(*, *) "After yac_fdef_field_metadata"
-
-             deallocate(field_double_1d)
           endif
 
           if(ndims == 2) then
@@ -320,18 +311,15 @@ CONTAINS
                 stop 
              endif
 
-             write(*, *) "field_double_2d"
+             write(*, *) "ATM: field_double_2d"
              write(*, *) field_double_2d
-             write(*, *)
              write(*, *) "ATM: After nf90_get_var"
 
              ! Define field
              CALL yac_fdef_field ( &
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
-             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
-
-             deallocate(field_double_2d)
+             write(*, *) "After yac_fdef_field"
           endif
 
           if(ndims == 3) then
@@ -353,19 +341,16 @@ CONTAINS
                 stop 
              endif
 
-             write(*, *) "field_double_4d"
-             write(*, *)
+             write(*, *) "ATM: field_double_4d"
              write(*, *) field_double_3d
-             write(*, *)
              write(*, *) "ATM: After nf90_get_var"
 
              ! Define field
              CALL yac_fdef_field ( &
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
-             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
+             write(*, *) "After yac_fdef_field"
 
-             deallocate(field_double_3d)
           endif
 
           
@@ -390,26 +375,29 @@ CONTAINS
                 stop 
              endif
 
-             write(*, *) "field_double_4d"
-             write(*, *)
+             write(*, *) "ATM: field_double_4d"
              write(*, *) field_double_4d
-             write(*, *)
              write(*, *) "ATM: After nf90_get_var"
 
              ! Define field
              CALL yac_fdef_field ( &
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
-             call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
+             write(*, *) "After yac_fdef_field"
 
-             deallocate(field_double_4d)
           endif
+
+          ! Define fields metadata
+          write(*, *) "ATM: Before yac_fdef_field_metadata"
+          write(field_metadata, *) trim(name)
+          call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
+          write(*, *) "ATM: After yac_fdef_field_metadata"
+
        end if
        
        if(xtype == NF90_FLOAT) THEN
           if(ndims == 1) then
              write(*, *) "ATM: Type FLOAT 1d"
-             write(*, *) "ATM: dimids(1): ", dimids(1)
              write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
              allocate(field_float_1d(list_dimension_attr(dimids(1))%len_of_dim))
              write(*, *) "After allocation"
@@ -423,8 +411,8 @@ CONTAINS
                 stop 
              endif
 
+             write(*, *) "ATM: field_float_1d"
              write(*, *) field_float_1d
-             write(*, *)
              write(*, *) "ATM: After nf90_get_var"
 
              ! Define field
