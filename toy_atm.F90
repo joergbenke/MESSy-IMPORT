@@ -39,7 +39,7 @@ MODULE toy_atm
 
   ! Basic decomposed grid information
   INTEGER(kind = 4)        :: num_vertices_lon, num_vertices_lat, num_vertices
-  INTEGER(kind = 4)        :: num_cells, num_vertices_per_cell
+  INTEGER(kind = 4)        :: num_cells, num_vertices_per_cell = 4
   
   integer, allocatable     :: global_cell_ids(:)
   INTEGER, ALLOCATABLE     :: cell_to_vertex(:,:)
@@ -62,21 +62,25 @@ CONTAINS
     CHARACTER(LEN=max_char_length), PARAMETER :: grid_filename = "grids/GEIA_MPIC1.0_X_bioland_NH3_2000-2000.nc"
     character(len = 1000) :: name
     character(len = 5000) :: grid_metadata, field_metadata, comp_metadata
-
+    ! Define communicator
     integer, intent(in) :: comm
     ! netCDF file identifier
     integer :: ncid
     ! Number of dimensions, variables, attributes and time steps in netCDF file
     integer :: ndim, nvar, natt, k_un
-    ! number 
-    integer :: k, len
+    ! Number of vertices (longitude, lattidtude, total)
     integer :: num_vertices_lon, num_vertices_lat, num_vertices
-    integer :: natts, xtype, ndims
-    integer :: status
+    ! Number of attributes, datatype of variable, number of dimensions, lenght of dimension
+    integer :: natts, xtype, ndims, len
+    integer :: k, status
+    ! Definition of the cyclicity of the mesh (regular mesh)
     integer, dimension(2) :: cyclic = (/1, 0 /)
     integer, allocatable, dimension(:) :: dimids
 
+    ! Correction value for corner centered grid
     real(kind = 8) :: correction_value_lat = 0.0, correction_value_lon = 0.0
+
+    ! Definition of 1, 2, 3 and 4d fields for FLOAT and DOUBLE
     real(kind = 8), allocatable, dimension(:) :: field_double_1d
     real(kind = 8), allocatable, dimension(:, :) :: field_double_2d 
     real(kind = 8), allocatable, dimension(:, :, :) :: field_double_3d 
@@ -100,7 +104,7 @@ CONTAINS
        integer :: len_of_dim
        character(len = 1000) :: name_of_dim
     end type dimension_attr
-    type(dimension_attr), allocatable, dimension(:) :: instance_dimension_attr
+    type(dimension_attr), allocatable, dimension(:) :: list_dimension_attr
 
     def_field = -1
     comp_comm = comm
@@ -114,9 +118,10 @@ CONTAINS
     write( comp_metadata, '(A)')  "Component MESSy IMPORT Server" 
     call yac_fdef_component_metadata(comp_name, comp_metadata)
     
-    ! Retrieve communicator for ATM component
+    ! Retrieve communicator for MESSy server component
     CALL yac_fget_comp_comm(comp_id, comp_comm)
 
+    ! Get component rank
     CALL MPI_Comm_rank(comp_comm, comp_rank, ierror)
 
     ! Read the grid and distribute it among all ATM processes
@@ -137,9 +142,9 @@ CONTAINS
     write(*, *) "----- ATMN: Open ocean netCDF file -----"
     status = nf90_open(trim(grid_filename), nf90_nowrite, ncid)
     if(status /= nf90_noerr) then
-       write(*, *) 'ATM: could not open (ocean): ', grid_filename
+       write(*, *) 'ATM: Could not open ', grid_filename
        write(*, *) status
-       write(*, *) '***** ATM: Unable to find netCDF file (ocean) *****'
+       write(*, *) '***** ATM: Unable to find netCDF file *****'
        stop
     endif
 
@@ -148,28 +153,30 @@ CONTAINS
     write(*, *) "----- ATM: Inquire number of dimensions, variables, etc -----"
     status = nf90_inquire(ncid, ndim, nvar, natt, k_un)
     if (status /= nf90_noerr) then
-       write(*, *) 'ATM: nf90_inquire error (ocean)'
+       write(*, *) 'ATM: nf90_inquire error'
        write(*, *) status
-       write(*, *) '***** ATM: Unable to read number of variables, etc (ocean) *****'
+       write(*, *) '***** ATM: Unable to read number of variables, etc *****'
        stop
     endif
 
-    ! Create list of type dimension_attr
-    allocate(instance_dimension_attr(ndim))
-    
+    ! Create list of type dimension_attr and dimids
+    allocate(list_dimension_attr(ndim))
+    allocate(dimids(ndim))
+
+    ! Read the values of every dimension to element k of list_dimension_attr
     write(*, *)
     write(*, *) "----- ATM: Output of dimensions id, length and name -----"
     do k = 1, ndim
        status = nf90_inquire_dimension(ncid, k, name, len)
        if (status /= nf90_noerr) then
-          write(*, *) "n90_inquire_dimension error (ocean)" 
+          write(*, *) "ATM: n90_inquire_dimension error" 
           write(*, *) status
           stop
        endif
 
-       instance_dimension_attr(k)%number_of_dim = k
-       instance_dimension_attr(k)%len_of_dim = len
-       instance_dimension_attr(k)%name_of_dim = name
+       list_dimension_attr(k)%number_of_dim = k
+       list_dimension_attr(k)%len_of_dim = len
+       write(list_dimension_attr(k)%name_of_dim, '(A)') name
     
        ! read number vertices in longitude directions (vertex is midpoint of cell)
        if(index(trim(name), 'lon') /= 0) then
@@ -180,7 +187,7 @@ CONTAINS
        if(index(trim(name), 'lat') /= 0) then
           num_vertices_lat = len
        end if
-    enddo
+    enddo ! do k = 1, ndim
     
     allocate(x_cells(num_vertices_lon))
     allocate(y_cells(num_vertices_lat))
@@ -193,14 +200,9 @@ CONTAINS
     num_vertices_lon = num_vertices_lon + 1
     num_vertices_lat = num_vertices_lat + 1 
 
-    ! Output of the dimensions
-    allocate(dimids(ndim))
+    ! Allocate vector for x and y vertices
     allocate(x_vertices(num_vertices_lon))
     allocate(y_vertices(num_vertices_lat))
-
-    !    call read_grid_from_netcdf(trim(grid_filename), num_vertices_lon, num_vertices_lat, num_cells, &
-    !         x_vertices, y_vertices, x_cells, y_cells, attr_grid_total)
-    num_vertices_per_cell = 4
 
     ! Allocate and fill the arry cell_to_vertex with the vertices of the elements
     allocate(cell_to_vertex(num_cells, 4))
@@ -209,20 +211,21 @@ CONTAINS
     ! Define local part of the grid
     write(*, *)
     write(*, *) "ATM: Before YAC_FDEF_GRID"
-!    CALL yac_fdef_grid ( &
-!         grid_name, num_vertices, num_cells, num_vertices_per_cell, &
-!         x_vertices, y_vertices, cell_to_vertex, grid_id )
+    !    CALL yac_fdef_grid ( &
+    !         grid_name, num_vertices, num_cells, num_vertices_per_cell, &
+    !         x_vertices, y_vertices, cell_to_vertex, grid_id )
 
+    ! Interface for yac_fdef_grid_reg2d_dble 
     cyclic = (/ 1,0/)
     CALL yac_fdef_grid( &
          grid_name, (/ num_vertices_lon, num_vertices_lat /), cyclic, &
          x_vertices, y_vertices, grid_id )
-    ! Interface for yac_fdef_grid_reg2d_dble 
 
     write(*, *) "ATM: After YAC_FDEF_GRID"
     write(*, *)
 
-    write( grid_metadata,'(A)') attr_grid_total
+    ! Define metadata for grid
+    write( grid_metadata,'(A)') "Mesh regular"
     CALL yac_fdef_grid_metadata(grid_name, grid_metadata)
 
     ! Set global cell ids
@@ -252,7 +255,6 @@ CONTAINS
     ! CALL yac_fset_mask(cell_sea_land_mask >= 0, cell_point_id)
     
 
-    
     attr_grid_total = ''
     do k = 1, nvar
        name = ''
@@ -269,8 +271,8 @@ CONTAINS
        if(xtype == NF90_DOUBLE) THEN
           if(ndims == 1) then
              write(*, *) "ATM: Type FLOAT 1d"
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
-             allocate(field_double_1d(instance_dimension_attr(dimids(1))%len_of_dim))
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             allocate(field_double_1d(list_dimension_attr(dimids(1))%len_of_dim))
              write(*, *) "After allocation of field_double_1d"
              
              ! Get values fron variable
@@ -304,9 +306,9 @@ CONTAINS
 
           if(ndims == 2) then
              write(*, *) "ATM: Type FLOAT 2d"
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
-             allocate(field_double_2d(instance_dimension_attr(dimids(1))%len_of_dim, instance_dimension_attr(dimids(2))%len_of_dim))
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
+             allocate(field_double_2d(list_dimension_attr(dimids(1))%len_of_dim, list_dimension_attr(dimids(2))%len_of_dim))
              write(*, *) "After allocation of field_double_2d"
              
              ! Get values fron variable
@@ -334,12 +336,12 @@ CONTAINS
 
           if(ndims == 3) then
              write(*, *) "ATM: Type DOUBLE 3d"
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(3))%len_of_dim
-             allocate(field_double_3d(instance_dimension_attr(dimids(1))%len_of_dim,&
-                  instance_dimension_attr(dimids(2))%len_of_dim, &
-                  instance_dimension_attr(dimids(3))%len_of_dim))
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(3))%len_of_dim
+             allocate(field_double_3d(list_dimension_attr(dimids(1))%len_of_dim,&
+                  list_dimension_attr(dimids(2))%len_of_dim, &
+                  list_dimension_attr(dimids(3))%len_of_dim))
              write(*, *) "After allocation of field_double_4d"
              
              ! Get values fron variable
@@ -369,14 +371,14 @@ CONTAINS
           
           if(ndims == 4) then
              write(*, *) "ATM: Type DOUBLE 4d"
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(3))%len_of_dim
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(4))%len_of_dim
-             allocate(field_double_4d(instance_dimension_attr(dimids(1))%len_of_dim,&
-                  instance_dimension_attr(dimids(2))%len_of_dim, &
-                  instance_dimension_attr(dimids(3))%len_of_dim, &
-                  instance_dimension_attr(dimids(4))%len_of_dim))
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(3))%len_of_dim
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(4))%len_of_dim
+             allocate(field_double_4d(list_dimension_attr(dimids(1))%len_of_dim,&
+                  list_dimension_attr(dimids(2))%len_of_dim, &
+                  list_dimension_attr(dimids(3))%len_of_dim, &
+                  list_dimension_attr(dimids(4))%len_of_dim))
              write(*, *) "After allocation of field_double_4d"
              
              ! Get values fron variable
@@ -408,8 +410,8 @@ CONTAINS
           if(ndims == 1) then
              write(*, *) "ATM: Type FLOAT 1d"
              write(*, *) "ATM: dimids(1): ", dimids(1)
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
-             allocate(field_float_1d(instance_dimension_attr(dimids(1))%len_of_dim))
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             allocate(field_float_1d(list_dimension_attr(dimids(1))%len_of_dim))
              write(*, *) "After allocation"
              
              ! Get values fron variable
@@ -440,9 +442,9 @@ CONTAINS
           if(ndims == 2) then
              write(*, *) "ATM: Type FLOAT 2d"
              write(*, *) "ATM: dimids(1), dimids(2): ", dimids(1), dimids(2)
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
-             allocate(field_float_2d(instance_dimension_attr(dimids(1))%len_of_dim, instance_dimension_attr(dimids(2))%len_of_dim))
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
+             allocate(field_float_2d(list_dimension_attr(dimids(1))%len_of_dim, list_dimension_attr(dimids(2))%len_of_dim))
              write(*, *) "After allocation"
              
              ! Get values fron variable
@@ -473,12 +475,12 @@ CONTAINS
 
           if(ndims == 3) then
              write(*, *) "ATM: Type FLOAT 3d"
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(3))%len_of_dim
-             allocate(field_float_3d(instance_dimension_attr(dimids(1))%len_of_dim,&
-                  instance_dimension_attr(dimids(2))%len_of_dim, &
-                  instance_dimension_attr(dimids(3))%len_of_dim))
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(3))%len_of_dim
+             allocate(field_float_3d(list_dimension_attr(dimids(1))%len_of_dim,&
+                  list_dimension_attr(dimids(2))%len_of_dim, &
+                  list_dimension_attr(dimids(3))%len_of_dim))
              write(*, *) "After allocation"
              
              ! Get values fron variable
@@ -509,14 +511,14 @@ CONTAINS
 
           if(ndims == 4) then
              write(*, *) "ATM: Type FLOAT 4d"
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(1))%len_of_dim
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(2))%len_of_dim
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(3))%len_of_dim
-             write(*, *) "ATM: instance_dimension_attr%len_of_dim: ", instance_dimension_attr(dimids(4))%len_of_dim
-             allocate(field_float_4d(instance_dimension_attr(dimids(1))%len_of_dim,&
-                  instance_dimension_attr(dimids(2))%len_of_dim, &
-                  instance_dimension_attr(dimids(3))%len_of_dim, &
-                  instance_dimension_attr(dimids(4))%len_of_dim))
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(3))%len_of_dim
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(4))%len_of_dim
+             allocate(field_float_4d(list_dimension_attr(dimids(1))%len_of_dim,&
+                  list_dimension_attr(dimids(2))%len_of_dim, &
+                  list_dimension_attr(dimids(3))%len_of_dim, &
+                  list_dimension_attr(dimids(4))%len_of_dim))
              write(*, *) "After allocation"
              
              ! Get values fron variable
