@@ -512,6 +512,19 @@ CONTAINS
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
              write(*, *) "After yac_fdef_field dim = 4"
+             ! Get field
+             CALL yac_fget(k, num_points, 1, field, info, ierror)
+
+             ! Get field name from field id
+             field_name = yac_fget_field_name(field_id)
+
+             IF (info /= YAC_ACTION_NONE) THEN
+                ! Print some debugging output
+                DO i = 1, collection_size
+                   WRITE(*, debug_format) &
+                        comp_name, field_name, i, MINVAL(field(:,i)), MAXVAL(field(:,i))
+                END DO
+             END IF
 
              deallocate(field_float_4d)
 
@@ -903,6 +916,8 @@ CONTAINS
              write(*, *)
           endif
        end if
+
+
     enddo
 
 

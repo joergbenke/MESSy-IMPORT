@@ -14,7 +14,7 @@ MODULE toy_atm
 
   PRIVATE
 
-  INTEGER :: t, ierror
+  INTEGER :: t
 
   ! Basic string paramters
   CHARACTER(LEN=max_char_length), PARAMETER :: yaml_filename = "input/coupling.yaml"
@@ -72,7 +72,7 @@ CONTAINS
     integer :: num_vertices_lon, num_vertices_lat, num_vertices
     ! Number of attributes, datatype of variable, number of dimensions, lenght of dimension
     integer :: natts, xtype, ndims, len
-    integer :: k, status
+    integer :: k, status, info, ierror
     ! Definition of the cyclicity of the mesh (regular mesh)
     integer, dimension(2) :: cyclic = (/1, 0 /)
     integer, allocatable, dimension(:) :: dimids
@@ -525,6 +525,8 @@ CONTAINS
           call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
           write(*, *) "ATM: After yac_fdef_field_metadata"
 
+          ! Put field
+          CALL yac_fput(k, num_vertices, 1, 1, field_float_4d, info, ierror)
        end if
 
        
@@ -612,20 +614,21 @@ CONTAINS
        write(*, *)
     endif
 
-    !
+
+    ! Complete definitions and compute interpolations
+    CALL yac_fenddef()
+
+     !
     ! End of reading netCDF file
     !
 
 
-
     ! Define fields
-    CALL define_fields( &
-         comp_id, cell_point_id, field_taux_id, field_tauy_id, field_sfwflx_id, &
-         field_sftemp_id, field_thflx_id, field_iceatm_id, field_sst_id, &
-         field_oceanu_id, field_oceanv_id, field_iceoce_id)
+!    CALL define_fields( &
+ !        comp_id, cell_point_id, field_taux_id, field_tauy_id, field_sfwflx_id, &
+  !       field_sftemp_id, field_thflx_id, field_iceatm_id, field_sst_id, &
+   !      field_oceanu_id, field_oceanv_id, field_iceoce_id)
 
-    ! Complete definitions and compute interpolations
-    CALL yac_fenddef()
 
     ! Initialise fields
     CALL init_fields()
@@ -691,7 +694,7 @@ CONTAINS
   SUBROUTINE sim_atm_timestep(timestep)
 
     INTEGER, INTENT(IN) :: timestep
-
+    integer :: ierror
     ! Do an atmosphere timestep
 
     ! ...
