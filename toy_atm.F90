@@ -187,6 +187,72 @@ CONTAINS
           num_vertices_lat = len
        end if
     enddo ! do k = 1, ndim
+
+
+    ! Read variables first part, to get the lon and lat out
+    attr_grid_total = ''
+    do k = 1, nvar
+       name = ''
+       status = nf90_inquire_variable(ncid, k, name, xtype, ndims, dimids, natts)
+       if (status /= nf90_noerr) then
+          write(*, *) "ATM: n90_inquire_variable error"
+          write(*, *) status
+          stop
+       endif
+
+       write(*, *) "ATM: 1st Results of nf90_inquire_variable call: ", ncid, ", ", k, ", ", trim(name), ", ", xtype, ", "
+       write(*, *) "ATM: 1st Results of nf90_inquire_variable call: ", ndims, ", ", dimids, ", ", natts
+
+       if(natts > 0) then
+          call parse_attr_list(ncid, natts, k, attr_grid_total)
+          write(*, *)
+          write(*, *) "1st ATM: attr_grid_total: ", trim(attr_grid_total)
+          write(*, *)
+       endif
+       
+       if(index(trim(attr_grid_total), 'degrees_east') /= 0) then
+          write(*, *) "ATM: 1st lon units degrees_east"
+          write(*, *) "ATM: 1st lon ", trim(attr_grid_total)
+       endif
+
+       if(index(trim(attr_grid_total), 'degrees_north') /= 0) then
+          write(*, *) "ATM: 1st lat units degrees north"
+          write(*, *) "ATM: 1st lat ", trim(attr_grid_total)
+       endif
+
+       
+       if(xtype == NF90_DOUBLE) THEN
+          if(ndims == 1) then
+             write(*, *) "ATM: Type DOUBLE 1d"
+             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             allocate(field_double_1d(list_dimension_attr(dimids(1))%len_of_dim))
+             write(*, *) "After allocation of field_double_1d"
+
+             ! Get values fron variable
+             write(*, *) "ATM: Before nf90_get_var"
+             status = nf90_get_var( ncid, k, field_double_1d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** ATM: n90_get_var error *****"
+                write(*, *) "ATM: status nf90_get_var: ", status
+                stop 
+             endif
+
+             ! Output of field
+             write(*, *) "ATM: field_double_1d"
+             write(*, *) field_double_1d
+             write(*, *) "ATM: After nf90_get_var"
+
+             ! Define field
+             write(*, *) "ATM Before yac_fdef_field"
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+             write(*, *) "After yac_fdef_field"
+          endif
+       end if
+    end do
+    ! END Read variables first part, to get the lon and lat out
+
     
     allocate(x_cells(num_vertices_lon))
     allocate(y_cells(num_vertices_lat))
@@ -751,184 +817,6 @@ CONTAINS
   END SUBROUTINE couple_to_ocn
 
 
-  ! ===================== subroutine read_grid_from_netcdf =========================
-  subroutine read_grid_from_netcdf(filename, num_vertices_lon, num_vertices_lat, num_cells, &
-       x_vertices, y_vertices, x_cells, y_cells, attr_grid_total)
-    use netcdf
-    implicit none
-
-    character(len = *) :: filename
-    character(len = 200) :: name
-    character(len = 5000), intent(inout) :: attr_grid_total
-
-    integer :: ncid, status, xtype, ndim, nvar, natt, natts
-    integer :: len, k, ndims, k_un
-    integer(kind = 4), intent(out) :: num_vertices_lon, num_vertices_lat, num_cells
-    integer, allocatable, dimension(:) :: dimids
-
-    real(kind = 8) :: correction_value_lon, correction_value_lat
-    real(kind = 8), allocatable, dimension(:) :: x_vertices, y_vertices
-    real(kind = 8), allocatable, dimension(:) :: x_cells, y_cells
-    
-    ! Open netCDF file
-    write(*, *)
-    write(*, *) "----- Open netCDF file (atm)-----"
-    status = nf90_open(trim(filename), nf90_nowrite, ncid)
-    if(status /= nf90_noerr) then
-       write(*, *) 'ATM: could not open: ', filename
-       write(*, *) status
-       write(*, *) '***** ATM: Unable to find netCDF file *****'
-       stop
-    endif
-
-    ! Inquiry of the nuber of variables, etc
-    write(*, *)
-    write(*, *) "----- atm: Inquire number of dimensions, variables, etc -----"
-    status = nf90_inquire(ncid, ndim, nvar, natt, k_un)
-    if (status /= nf90_noerr) then
-       write(*, *) 'ATM: nf90_inquire error'
-       write(*, *) status
-       write(*, *) '***** ATM: Unable to read number of variables, etc *****'
-       stop
-    endif
-
-    ! Output of the dimensions
-    allocate(dimids(ndim))
-
-    write(*, *)
-    write(*, *) "----- ATM: Output of dimensions id, length and name -----"
-    do k = 1, ndim
-       status = nf90_inquire_dimension(ncid, k, name, len)
-       if (status /= nf90_noerr) then
-          write(*, *) "ATM: n90_inquire_dimension error"
-          write(*, *) status
-          stop
-       endif
-
-       ! read number vertices in longitude directions (vertex is midpoint of cell)
-       if(index(trim(name), 'lon') /= 0) then
-          num_vertices_lon = len
-       end if
-
-       ! read number vertices in lattitude directions (vertex is midpoint of cell)
-       if(index(trim(name), 'lat') /= 0) then
-          num_vertices_lat = len
-       end if
-    enddo
-!    write(*, *) "ATM: lon = ", num_vertices_lon, " lat = ", num_vertices_lat
-    
-    allocate(x_cells(num_vertices_lon))
-    allocate(y_cells(num_vertices_lat))
-
-    ! Number of cells is product of vertices in lat and lon direction because
-    ! usually the coordinates are centered in an element
-    num_cells = num_vertices_lon * num_vertices_lat
-
-    ! Now correction to number of vertices if vertex is on a real node and not in cell center
-    num_vertices_lon = num_vertices_lon + 1
-    num_vertices_lat = num_vertices_lat + 1 
-
-
-    ! Output of the variables
-!    write(*, *)
-!    write(*, *) "ATM: ----- Variables -----"
-    attr_grid_total = ''
-    do k = 1, nvar
-       name = ''
-       status = nf90_inquire_variable(ncid, k, name, xtype, ndims, dimids, natts)
-       if (status /= nf90_noerr) then
-          write(*, *) "ATM: n90_inquire_variable error"
-          write(*, *) status
-          stop
-       endif
-
-       if(index(trim(name), 'lon') /= 0) then
-          allocate(x_vertices(num_vertices_lon))
-          
-          status = nf90_get_var( ncid, k, x_cells ) !(/ 1,1,1 /) )
-          if (status /= nf90_noerr) then
-             write(*, *) "***** ATM: n90_get_var error *****"
-             write(*, *) "ATM: status nf90_get_var: ", status
-             stop 
-          endif
-
-          ! Correction
-          ! Assumption:
-          !    - whole erath (360 degrees laongitude, 180 degrees latitude)
-          !    - cell centered and corner centered coordinates
-          correction_value_lon = 360.0 / ((num_vertices_lon - 1) * 2)
-          write(*, *) "ATM: correction_value_lon: ", correction_value_lon
-          if( abs( x_cells(1) - (-180.0) ) > 1e-10) then
-             write(*, *) "ATM: Cell centered values"
-             do i = 1, num_vertices_lon - 1
-                x_vertices(i) = x_cells(i) - correction_value_lon  ! 0.5
-             end do
-          else
-             write(*, *) "ATM: Corner Centered values"
-          end if
-          x_vertices(num_vertices_lon) = 180.0
-          write(*, *) x_vertices
-          
-          if(natts > 0) then
-             write(* ,*) '==== ATM: data attributes (local) ===='
-             call parse_attr_list(ncid, natts, k, attr_grid_total)
-             write(*, *)
-             write(*, *) "ATM: attr_grid_total (lon; from call): ", trim(attr_grid_total)
-             write(*, *)
-          endif
-       end if
-
-       if(index(trim(name), 'lat') /= 0) then
-          allocate(y_vertices(num_vertices_lat))
-
-          status = nf90_get_var( ncid, k, y_cells ) 
-          if (status /= nf90_noerr) then
-             write(*, *) "***** ATM: n90_get_var error *****"
-             write(*, *) "ATM: status nf90_get_var: ", status
-             stop 
-          endif
-
-          ! Corection
-          ! Assumption:
-          !    - whole erath (360 degrees laongitude, 180 degrees latitude)
-          !    - cell and corner centered coordinates
-          correction_value_lat = 180.0 / ((num_vertices_lat - 1) * 2)
-          write(*, *) "ATM: correction_value_lat: ", correction_value_lat
-          if( (y_cells(1) - (-90.0)) > 1e-10) then
-             write(*, *) "ATM: Cell centered values"
-             do i = 1, num_vertices_lat - 1
-                y_vertices(i) = y_cells(i) - correction_value_lat  !0.5
-             end do
-          else
-             write(*, *) "ATM: Cell centered values"
-          end if
-          y_vertices(num_vertices_lat) = 90.0
-
-          if(natts > 0) then
-             write(* ,*) '==== ATM: data attributes (local) ===='
-             call parse_attr_list(ncid, natts, k, attr_grid_total)
-             write(*, *)
-             write(*, *) "ATM: attr_grid_total (lat; from call): ", trim(attr_grid_total)
-             write(*, *)
-          endif
-       end if
-    enddo
-
-
-! Allocate and fill the vertex arrays (for longitude and lattitude
-    num_vertices = num_vertices_lon * num_vertices_lat
-    
-    ! Output of the attributes
-    if(natt > 0) then
-       write(*, *) '==== ATM: global attributes ===='
-       call parse_attr_list(ncid, natt, nf90_global, attr_grid_total)
-       write(*, *)
-       write(*, *) "ATM: attr_grid_total (global; from call): ", trim(attr_grid_total)
-       write(*, *)
-    endif
-
-  end subroutine read_grid_from_netcdf
-
   !=============================================================================
   subroutine parse_attr_list( ncid, n_attr_loc, varid, attr_grid_total )
     use netcdf
@@ -956,7 +844,8 @@ CONTAINS
           if (status /= 0) stop 'error calling get_att'
           name = trim(name)
           attr_grid_total = trim(attr_grid_total)
-          write(attr_grid_total, '(A, " ", A, " ", A, "; ")') trim(attr_grid_total), trim(name), trim(c1d)
+!          write(attr_grid_total, '(A, " ", A, " ", A, "; ")') trim(attr_grid_total), trim(name), trim(c1d)
+          write(attr_grid_total, '(A, " ", A, "; ")') trim(name), trim(c1d)
           write(*, *) "ATM: attr_grid_total: ", trim(attr_grid_total)
        else if ( xtype == NF90_INT ) then
           if (len > 1) then

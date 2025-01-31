@@ -121,7 +121,7 @@ CONTAINS
     ! Get component rank
     CALL MPI_Comm_rank(comp_comm, comp_rank, ierror)
 
-    ! Read the grid and distribute it among all ATM processes
+    ! Read the grid and distribute it among all OCN processes
     !CALL read_icon_grid( &
     !     grid_filename, comp_comm, cell_to_vertex, x_vertices, &
     !     y_vertices, x_cells, y_cells, cell_sea_land_mask, &
@@ -136,23 +136,23 @@ CONTAINS
     
     ! Open netCDF file
     write(*, *)
-    write(*, *) "----- ATMN: Open ocean netCDF file -----"
+    write(*, *) "----- OCNN: Open ocean netCDF file -----"
     status = nf90_open(trim(grid_filename), nf90_nowrite, ncid)
     if(status /= nf90_noerr) then
-       write(*, *) 'ATM: Could not open ', grid_filename
+       write(*, *) 'OCN: Could not open ', grid_filename
        write(*, *) status
-       write(*, *) '***** ATM: Unable to find netCDF file *****'
+       write(*, *) '***** OCN: Unable to find netCDF file *****'
        stop
     endif
 
     ! Inquiry of the nuber of variables, etc
     write(*, *)
-    write(*, *) "----- ATM: Inquire number of dimensions, variables, etc -----"
+    write(*, *) "----- OCN: Inquire number of dimensions, variables, etc -----"
     status = nf90_inquire(ncid, ndim, nvar, natt, k_un)
     if (status /= nf90_noerr) then
-       write(*, *) 'ATM: nf90_inquire error'
+       write(*, *) 'OCN: nf90_inquire error'
        write(*, *) status
-       write(*, *) '***** ATM: Unable to read number of variables, etc *****'
+       write(*, *) '***** OCN: Unable to read number of variables, etc *****'
        stop
     endif
 
@@ -162,11 +162,11 @@ CONTAINS
 
     ! Read the values of every dimension to element k of list_dimension_attr
     write(*, *)
-    write(*, *) "----- ATM: Output of dimensions id, length and name -----"
+    write(*, *) "----- OCN: Output of dimensions id, length and name -----"
     do k = 1, ndim
        status = nf90_inquire_dimension(ncid, k, name, len)
        if (status /= nf90_noerr) then
-          write(*, *) "ATM: n90_inquire_dimension error" 
+          write(*, *) "OCN: n90_inquire_dimension error" 
           write(*, *) status
           stop
        endif
@@ -185,6 +185,72 @@ CONTAINS
           num_vertices_lat = len
        end if
     enddo ! do k = 1, ndim
+
+
+    
+    ! Read variables first part, to get the lon and lat out
+    write(attr_grid_total, '(A)') ''
+    do k = 1, nvar
+       name = ''
+       status = nf90_inquire_variable(ncid, k, name, xtype, ndims, dimids, natts)
+       if (status /= nf90_noerr) then
+          write(*, *) "OCN: n90_inquire_variable error"
+          write(*, *) status
+          stop
+       endif
+
+       write(*, *) "OCN: 1st Results of nf90_inquire_variable call: ", ncid, ", ", k, ", ", trim(name), ", ", xtype, ", "
+       write(*, *) "OCN: 1st Results of nf90_inquire_variable call: ", ndims, ", ", dimids, ", ", natts
+
+       if(natts > 0) then
+          call parse_attr_list(ncid, natts, k, attr_grid_total)
+          write(*, *)
+          write(*, *) "OCN: attr_grid_total: ", trim(attr_grid_total)
+          write(*, *)
+       endif
+       
+       if(index(trim(attr_grid_total), 'degrees_east') /= 0) then
+          write(*, *) "1st lon units degrees_east"
+          write(*, *) "1st lon ", trim(attr_grid_total)
+       endif
+
+       if(index(trim(attr_grid_total), 'degrees_north') /= 0) then
+          write(*, *) "1st lat units degrees north"
+          write(*, *) "1st lat ", trim(attr_grid_total)
+       endif
+
+       
+       if(xtype == NF90_DOUBLE) THEN
+          if(ndims == 1) then
+             write(*, *) "OCN: Type DOUBLE 1d"
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             allocate(field_double_1d(list_dimension_attr(dimids(1))%len_of_dim))
+             write(*, *) "After allocation of field_double_1d"
+
+             ! Get values fron variable
+             write(*, *) "OCN: Before nf90_get_var"
+             status = nf90_get_var( ncid, k, field_double_1d ) 
+             if (status /= nf90_noerr) then
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
+                stop 
+             endif
+
+             ! Output of field
+             write(*, *) "OCN: field_double_1d"
+             write(*, *) field_double_1d
+             write(*, *) "OCN: After nf90_get_var"
+
+             ! Define field
+             write(*, *) "OCN Before yac_fdef_field"
+             CALL yac_fdef_field ( &
+                  name, comp_id, point_ids, num_point_ids, collection_size, &
+                  timestep, timestep_unit, def_field)
+             write(*, *) "After yac_fdef_field"
+          endif
+       end if
+    end do
+    ! END Read variables first part, to get the lon and lat out
     
     allocate(x_cells(num_vertices_lon))
     allocate(y_cells(num_vertices_lat))
@@ -208,7 +274,7 @@ CONTAINS
 
     ! Define local part of the grid
     write(*, *)
-    write(*, *) "ATM: Before YAC_FDEF_GRID"
+    write(*, *) "OCN: Before YAC_FDEF_GRID"
     !    CALL yac_fdef_grid ( &
     !         grid_name, num_vertices, num_cells, num_vertices_per_cell, &
     !         x_vertices, y_vertices, cell_to_vertex, grid_id )
@@ -219,7 +285,7 @@ CONTAINS
          grid_name, (/ num_vertices_lon, num_vertices_lat /), cyclic, &
          x_vertices, y_vertices, grid_id )
 
-    write(*, *) "ATM: After YAC_FDEF_GRID"
+    write(*, *) "OCN: After YAC_FDEF_GRID"
     write(*, *)
 
     ! Define metadata for grid
@@ -231,7 +297,7 @@ CONTAINS
 
     ! Define location of the actual data (on cell centers)
     write(*, *)
-    write(*, *) "ATM: Before YAC_FDEF_POINTS"
+    write(*, *) "OCN: Before YAC_FDEF_POINTS"
 
     CALL yac_fdef_points ( &
          grid_id, (/ num_vertices_lon, num_vertices_lat /), YAC_LOCATION_CORNER, &
@@ -246,7 +312,7 @@ CONTAINS
     !        x_cells, y_cells, cell_point_id )
 
     write(*, *)
-    write(*, *) "ATM: After YAC_FDEF_POINTS"
+    write(*, *) "OCN: After YAC_FDEF_POINTS"
 
     ! ! Set mask for cell centers
     ! CALL yac_fset_mask(cell_sea_land_mask >= 0, cell_point_id)
@@ -257,37 +323,37 @@ CONTAINS
        name = ''
        status = nf90_inquire_variable(ncid, k, name, xtype, ndims, dimids, natts)
        if (status /= nf90_noerr) then
-          write(*, *) "ATM: n90_inquire_variable error"
+          write(*, *) "OCN: n90_inquire_variable error"
           write(*, *) status
           stop
        endif
 
-       write(*, *) "ATM: Results of nf90_inquire_variable call: ", ncid, ", ", k, ", ", trim(name), ", ", xtype, ", "
-       write(*, *) "ATM: Results of nf90_inquire_variable call: ", ndims, ", ", dimids, ", ", natts
+       write(*, *) "OCN: Results of nf90_inquire_variable call: ", ncid, ", ", k, ", ", trim(name), ", ", xtype, ", "
+       write(*, *) "OCN: Results of nf90_inquire_variable call: ", ndims, ", ", dimids, ", ", natts
 
        if(xtype == NF90_DOUBLE) THEN
           if(ndims == 1) then
-             write(*, *) "ATM: Type DOUBLE 1d"
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: Type DOUBLE 1d"
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
              allocate(field_double_1d(list_dimension_attr(dimids(1))%len_of_dim))
              write(*, *) "After allocation of field_double_1d"
              
              ! Get values fron variable
-             write(*, *) "ATM: Before nf90_get_var"
+             write(*, *) "OCN: Before nf90_get_var"
              status = nf90_get_var( ncid, k, field_double_1d ) 
              if (status /= nf90_noerr) then
-                write(*, *) "***** ATM: n90_get_var error *****"
-                write(*, *) "ATM: status nf90_get_var: ", status
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
                 stop 
              endif
 
              ! Output of field
-             write(*, *) "ATM: field_double_1d"
+             write(*, *) "OCN: field_double_1d"
              write(*, *) field_double_1d
-             write(*, *) "ATM: After nf90_get_var"
+             write(*, *) "OCN: After nf90_get_var"
 
              ! Define field
-             write(*, *) "ATM Before yac_fdef_field"
+             write(*, *) "OCN Before yac_fdef_field"
              CALL yac_fdef_field ( &
                   name, comp_id, point_ids, num_point_ids, collection_size, &
                   timestep, timestep_unit, def_field)
@@ -295,24 +361,24 @@ CONTAINS
           endif
 
           if(ndims == 2) then
-             write(*, *) "ATM: Type FLOAT 2d"
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "OCN: Type FLOAT 2d"
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
              allocate(field_double_2d(list_dimension_attr(dimids(1))%len_of_dim, list_dimension_attr(dimids(2))%len_of_dim))
              write(*, *) "After allocation of field_double_2d"
              
              ! Get values fron variable
-             write(*, *) "ATM: Before nf90_get_var"
+             write(*, *) "OCN: Before nf90_get_var"
              status = nf90_get_var( ncid, k, field_double_2d ) 
              if (status /= nf90_noerr) then
-                write(*, *) "***** ATM: n90_get_var error *****"
-                write(*, *) "ATM: status nf90_get_var: ", status
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
                 stop 
              endif
 
-             write(*, *) "ATM: field_double_2d"
+             write(*, *) "OCN: field_double_2d"
              write(*, *) field_double_2d
-             write(*, *) "ATM: After nf90_get_var"
+             write(*, *) "OCN: After nf90_get_var"
 
              ! Define field
              CALL yac_fdef_field ( &
@@ -322,27 +388,27 @@ CONTAINS
           endif
 
           if(ndims == 3) then
-             write(*, *) "ATM: Type DOUBLE 3d"
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(3))%len_of_dim
+             write(*, *) "OCN: Type DOUBLE 3d"
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(3))%len_of_dim
              allocate(field_double_3d(list_dimension_attr(dimids(1))%len_of_dim,&
                   list_dimension_attr(dimids(2))%len_of_dim, &
                   list_dimension_attr(dimids(3))%len_of_dim))
              write(*, *) "After allocation of field_double_4d"
              
              ! Get values fron variable
-             write(*, *) "ATM: Before nf90_get_var"
+             write(*, *) "OCN: Before nf90_get_var"
              status = nf90_get_var( ncid, k, field_double_3d ) 
              if (status /= nf90_noerr) then
-                write(*, *) "***** ATM: n90_get_var error *****"
-                write(*, *) "ATM: status nf90_get_var: ", status
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
                 stop 
              endif
 
-             write(*, *) "ATM: field_double_4d"
+             write(*, *) "OCN: field_double_4d"
              write(*, *) field_double_3d
-             write(*, *) "ATM: After nf90_get_var"
+             write(*, *) "OCN: After nf90_get_var"
 
              ! Define field
              CALL yac_fdef_field ( &
@@ -354,11 +420,11 @@ CONTAINS
 
           
           if(ndims == 4) then
-             write(*, *) "ATM: Type DOUBLE 4d"
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(3))%len_of_dim
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(4))%len_of_dim
+             write(*, *) "OCN: Type DOUBLE 4d"
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(3))%len_of_dim
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(4))%len_of_dim
              allocate(field_double_4d(list_dimension_attr(dimids(1))%len_of_dim,&
                   list_dimension_attr(dimids(2))%len_of_dim, &
                   list_dimension_attr(dimids(3))%len_of_dim, &
@@ -366,17 +432,17 @@ CONTAINS
              write(*, *) "After allocation of field_double_4d"
              
              ! Get values fron variable
-             write(*, *) "ATM: Before nf90_get_var"
+             write(*, *) "OCN: Before nf90_get_var"
              status = nf90_get_var( ncid, k, field_double_4d ) 
              if (status /= nf90_noerr) then
-                write(*, *) "***** ATM: n90_get_var error *****"
-                write(*, *) "ATM: status nf90_get_var: ", status
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
                 stop 
              endif
 
-             write(*, *) "ATM: field_double_4d"
+             write(*, *) "OCN: field_double_4d"
              write(*, *) field_double_4d
-             write(*, *) "ATM: After nf90_get_var"
+             write(*, *) "OCN: After nf90_get_var"
 
              ! Define field
              CALL yac_fdef_field ( &
@@ -387,32 +453,32 @@ CONTAINS
           endif
 
           ! Define fields metadata
-          write(*, *) "ATM: Before yac_fdef_field_metadata"
+          write(*, *) "OCN: Before yac_fdef_field_metadata"
           write(field_metadata, *) trim(name)
           call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
-          write(*, *) "ATM: After yac_fdef_field_metadata"
+          write(*, *) "OCN: After yac_fdef_field_metadata"
 
        end if
        
        if(xtype == NF90_FLOAT) THEN
           if(ndims == 1) then
-             write(*, *) "ATM: Type FLOAT 1d"
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: Type FLOAT 1d"
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
              allocate(field_float_1d(list_dimension_attr(dimids(1))%len_of_dim))
              write(*, *) "After allocation"
              
              ! Get values fron variable
-             write(*, *) "ATM: Before nf90_get_var"
+             write(*, *) "OCN: Before nf90_get_var"
              status = nf90_get_var( ncid, k, field_float_1d ) 
              if (status /= nf90_noerr) then
-                write(*, *) "***** ATM: n90_get_var error *****"
-                write(*, *) "ATM: status nf90_get_var: ", status
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
                 stop 
              endif
 
-             write(*, *) "ATM: field_float_1d"
+             write(*, *) "OCN: field_float_1d"
              write(*, *) field_float_1d
-             write(*, *) "ATM: After nf90_get_var"
+             write(*, *) "OCN: After nf90_get_var"
 
              ! Define field
              CALL yac_fdef_field ( &
@@ -425,25 +491,25 @@ CONTAINS
           endif
 
           if(ndims == 2) then
-             write(*, *) "ATM: Type FLOAT 2d"
-             write(*, *) "ATM: dimids(1), dimids(2): ", dimids(1), dimids(2)
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "OCN: Type FLOAT 2d"
+             write(*, *) "OCN: dimids(1), dimids(2): ", dimids(1), dimids(2)
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
              allocate(field_float_2d(list_dimension_attr(dimids(1))%len_of_dim, list_dimension_attr(dimids(2))%len_of_dim))
              write(*, *) "After allocation"
              
              ! Get values fron variable
-             write(*, *) "ATM: Before nf90_get_var"
+             write(*, *) "OCN: Before nf90_get_var"
              status = nf90_get_var( ncid, k, field_float_2d ) 
              if (status /= nf90_noerr) then
-                write(*, *) "***** ATM: n90_get_var error *****"
-                write(*, *) "ATM: status nf90_get_var: ", status
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
                 stop 
              endif
 
              write(*, *) field_float_2d
              write(*, *)
-             write(*, *) "ATM: After nf90_get_var"
+             write(*, *) "OCN: After nf90_get_var"
 
              ! Define field
              CALL yac_fdef_field ( &
@@ -454,26 +520,26 @@ CONTAINS
 
 
           if(ndims == 3) then
-             write(*, *) "ATM: Type FLOAT 3d"
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(3))%len_of_dim
+             write(*, *) "OCN: Type FLOAT 3d"
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(3))%len_of_dim
              allocate(field_float_3d(list_dimension_attr(dimids(1))%len_of_dim,&
                   list_dimension_attr(dimids(2))%len_of_dim, &
                   list_dimension_attr(dimids(3))%len_of_dim))
              write(*, *) "After allocation"
              
              ! Get values fron variable
-             write(*, *) "ATM: Before nf90_get_var"
+             write(*, *) "OCN: Before nf90_get_var"
              status = nf90_get_var( ncid, k, field_float_3d ) 
              if (status /= nf90_noerr) then
-                write(*, *) "***** ATM: n90_get_var error *****"
-                write(*, *) "ATM: status nf90_get_var: ", status
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
                 stop 
              endif
 
              write(*, *) field_float_3d
-             write(*, *) "ATM: After nf90_get_var"
+             write(*, *) "OCN: After nf90_get_var"
 
              ! Define field
              CALL yac_fdef_field ( &
@@ -484,11 +550,11 @@ CONTAINS
 
 
           if(ndims == 4) then
-             write(*, *) "ATM: Type FLOAT 4d"
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(3))%len_of_dim
-             write(*, *) "ATM: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(4))%len_of_dim
+             write(*, *) "OCN: Type FLOAT 4d"
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(2))%len_of_dim
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(3))%len_of_dim
+             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(4))%len_of_dim
              allocate(field_float_4d(list_dimension_attr(dimids(1))%len_of_dim,&
                   list_dimension_attr(dimids(2))%len_of_dim, &
                   list_dimension_attr(dimids(3))%len_of_dim, &
@@ -496,16 +562,16 @@ CONTAINS
              write(*, *) "After allocation"
              
              ! Get values fron variable
-             write(*, *) "ATM: Before nf90_get_var"
+             write(*, *) "OCN: Before nf90_get_var"
              status = nf90_get_var( ncid, k, field_float_4d ) 
              if (status /= nf90_noerr) then
-                write(*, *) "***** ATM: n90_get_var error *****"
-                write(*, *) "ATM: status nf90_get_var: ", status
+                write(*, *) "***** OCN: n90_get_var error *****"
+                write(*, *) "OCN: status nf90_get_var: ", status
                 stop 
              endif
 
              write(*, *) field_float_4d
-             write(*, *) "ATM: After nf90_get_var"
+             write(*, *) "OCN: After nf90_get_var"
 
              ! Define field
              CALL yac_fdef_field ( &
@@ -531,10 +597,10 @@ CONTAINS
           endif
 
           ! Define fields metadata
-          write(*, *) "ATM: Before yac_fdef_field_metadata"
+          write(*, *) "OCN: Before yac_fdef_field_metadata"
           write(field_metadata, *) trim(name)
           call yac_fdef_field_metadata(comp_name, grid_name, name, field_metadata)
-          write(*, *) "ATM: After yac_fdef_field_metadata"
+          write(*, *) "OCN: After yac_fdef_field_metadata"
 
        end if
 
@@ -543,8 +609,8 @@ CONTAINS
           
           status = nf90_get_var( ncid, k, x_cells ) !(/ 1,1,1 /) )
           if (status /= nf90_noerr) then
-             write(*, *) "***** ATM: n90_get_var error *****"
-             write(*, *) "ATM: status nf90_get_var: ", status
+             write(*, *) "***** OCN: n90_get_var error *****"
+             write(*, *) "OCN: status nf90_get_var: ", status
              stop 
           endif
 
@@ -553,23 +619,23 @@ CONTAINS
           !    - whole erath (360 degrees laongitude, 180 degrees latitude)
           !    - cell centered and corner centered coordinates
           correction_value_lon = 360.0 / ((num_vertices_lon - 1) * 2)
-          write(*, *) "ATM: correction_value_lon: ", correction_value_lon
+          write(*, *) "OCN: correction_value_lon: ", correction_value_lon
           if( abs( x_cells(1) - (-180.0) ) > 1e-10) then
-             write(*, *) "ATM: Cell centered values"
+             write(*, *) "OCN: Cell centered values"
              do i = 1, num_vertices_lon - 1
                 x_vertices(i) = x_cells(i) - correction_value_lon  ! 0.5
              end do
           else
-             write(*, *) "ATM: Corner Centered values"
+             write(*, *) "OCN: Corner Centered values"
           end if
           x_vertices(num_vertices_lon) = 180.0
           write(*, *) x_vertices
           
           if(natts > 0) then
-             write(* ,*) '==== ATM: data attributes (local) ===='
+             write(* ,*) '==== OCN: data attributes (local) ===='
              call parse_attr_list(ncid, natts, k, attr_grid_total)
              write(*, *)
-             write(*, *) "ATM: attr_grid_total (lon; from call): ", trim(attr_grid_total)
+             write(*, *) "OCN: attr_grid_total (lon; from call): ", trim(attr_grid_total)
              write(*, *)
           endif
 
@@ -581,8 +647,8 @@ CONTAINS
 
           status = nf90_get_var( ncid, k, y_cells ) 
           if (status /= nf90_noerr) then
-             write(*, *) "***** ATM: n90_get_var error *****"
-             write(*, *) "ATM: status nf90_get_var: ", status
+             write(*, *) "***** OCN: n90_get_var error *****"
+             write(*, *) "OCN: status nf90_get_var: ", status
              stop 
           endif
 
@@ -591,22 +657,22 @@ CONTAINS
           !    - whole erath (360 degrees laongitude, 180 degrees latitude)
           !    - cell and corner centered coordinates
           correction_value_lat = 180.0 / ((num_vertices_lat - 1) * 2)
-          write(*, *) "ATM: correction_value_lat: ", correction_value_lat
+          write(*, *) "OCN: correction_value_lat: ", correction_value_lat
           if( (y_cells(1) - (-90.0)) > 1e-10) then
-             write(*, *) "ATM: Cell centered values"
+             write(*, *) "OCN: Cell centered values"
              do i = 1, num_vertices_lat - 1
                 y_vertices(i) = y_cells(i) - correction_value_lat  !0.5
              end do
           else
-             write(*, *) "ATM: Cell centered values"
+             write(*, *) "OCN: Cell centered values"
           end if
           y_vertices(num_vertices_lat) = 90.0
 
           if(natts > 0) then
-             write(* ,*) '==== ATM: data attributes (local) ===='
+             write(* ,*) '==== OCN: data attributes (local) ===='
              call parse_attr_list(ncid, natts, k, attr_grid_total)
              write(*, *)
-             write(*, *) "ATM: attr_grid_total (lat; from call): ", trim(attr_grid_total)
+             write(*, *) "OCN: attr_grid_total (lat; from call): ", trim(attr_grid_total)
              write(*, *)
           endif
           cycle
@@ -616,10 +682,10 @@ CONTAINS
 
     ! Output of the attributes
     if(natt > 0) then
-       write(*, *) '==== ATM: global attributes ===='
+       write(*, *) '==== OCN: global attributes ===='
        call parse_attr_list(ncid, natt, nf90_global, attr_grid_total)
        write(*, *)
-       write(*, *) "ATM: attr_grid_total (global; from call): ", trim(attr_grid_total)
+       write(*, *) "OCN: attr_grid_total (global; from call): ", trim(attr_grid_total)
        write(*, *)
     endif
 
@@ -757,182 +823,6 @@ CONTAINS
   END SUBROUTINE couple_to_atm
 
 
-    ! ===================== subroutine readgrid_from_netcdf =========================
-  subroutine read_grid_from_netcdf(filename, num_vertices_lon, num_vertices_lat, num_cells, &
-       x_vertices, y_vertices, x_cells, y_cells, attr_grid_total)
-    use netcdf
-    implicit none
-
-    character(len = *) :: filename
-    character(len = 200) :: name
-    character(len = 5000) :: attr_grid_total
-
-    integer :: ncid, status, xtype, ndim, nvar, natt, natts
-    integer :: len, k, ndims, k_un
-    integer(kind = 4), intent(out) :: num_vertices_lon, num_vertices_lat, num_cells
-    integer, allocatable, dimension(:) :: dimids
-
-    real(kind = 8) :: correction_value_lon, correction_value_lat
-    real(kind = 8), allocatable, dimension(:) :: x_vertices, y_vertices
-    real(kind = 8), allocatable, dimension(:) :: x_cells, y_cells
-    
-    ! Open netCDF file
-    write(*, *)
-    write(*, *) "----- ATM: Open ocean netCDF file -----"
-    status = nf90_open(trim(filename), nf90_nowrite, ncid)
-    if(status /= nf90_noerr) then
-       write(*, *) 'ATM: could not open (ocean): ', filename
-       write(*, *) status
-       write(*, *) '***** ATM: Unable to find netCDF file (ocean) *****'
-       stop
-    endif
-
-    ! Inquiry of the nuber of variables, etc
-    write(*, *)
-    write(*, *) "----- ATM: Inquire number of dimensions, variables, etc -----"
-    status = nf90_inquire(ncid, ndim, nvar, natt, k_un)
-    if (status /= nf90_noerr) then
-       write(*, *) 'ATM: nf90_inquire error (ocean)'
-       write(*, *) status
-       write(*, *) '***** ATM: Unable to read number of variables, etc (ocean) *****'
-       stop
-    endif
-
-    ! Output of the dimensions
-    allocate(dimids(ndim))
-
-    write(*, *)
-    write(*, *) "----- ATM: Output of dimensions id, length and name -----"
-    do k = 1, ndim
-       status = nf90_inquire_dimension(ncid, k, name, len)
-       if (status /= nf90_noerr) then
-          write(*, *) "n90_inquire_dimension error (ocean)" 
-          write(*, *) status
-          stop
-       endif
-
-       ! read number vertices in longitude directions (vertex is midpoint of cell)
-       if(index(trim(name), 'lon') /= 0) then
-          num_vertices_lon = len
-       end if
-
-       ! read number vertices in lattitude directions (vertex is midpoint of cell)
-       if(index(trim(name), 'lat') /= 0) then
-          num_vertices_lat = len
-       end if
-    enddo
-
-    allocate(x_cells(num_vertices_lon))
-    allocate(y_cells(num_vertices_lat))
-
-    ! Number of cells is product of vertices in lat and lon direction because
-    ! usually the coordinates are centered in an element
-    num_cells = num_vertices_lon * num_vertices_lat
-
-    ! Now correction to number of vertices if vertex is on a real node and not in cell center
-    num_vertices_lon = num_vertices_lon + 1
-    num_vertices_lat = num_vertices_lat + 1 
-
-    ! Output of the variables
-!    write(*, *)
-!    write(*, *) "ATM: ----- Variables -----"
-    attr_grid_total = ''
-    do k = 1, nvar
-       name = ''
-       status = nf90_inquire_variable(ncid, k, name, xtype, ndims, dimids, natts)
-       if (status /= nf90_noerr) then
-          write(*, *) "ATM: n90_inquire_variable error"
-          write(*, *) status
-          stop
-       endif
-
-       if(index(trim(name), 'lon') /= 0) then
-          allocate(x_vertices(num_vertices_lon))
-          
-          status = nf90_get_var( ncid, k, x_cells ) 
-          if (status /= nf90_noerr) then
-             write(*, *) "***** n90_get_var error *****"
-             write(*, *) "status", status
-             stop 
-          endif
-
-          ! Correction
-          ! Assumption:
-          !    - whole erath (360 degrees laongitude, 180 degrees latitude)
-          !    - cell centered and corner centered coordinates
-          correction_value_lon = 360.0 / ((num_vertices_lon - 1) * 2)
-          write(*, *) "ATM: correction_value_lon: ", correction_value_lon
-          if( abs( x_cells(1) - (-180.0) ) > 1e-10) then
-             write(*, *) "ATM: Cell centered values"
-             do i = 1, num_vertices_lon - 1
-                x_vertices(i) = x_cells(i) - correction_value_lon  ! 0.5
-             end do
-          else
-             write(*, *) "ATM: Corner Centered values"
-          end if
-          x_vertices(num_vertices_lon) = 180.0
-          write(*, *) x_vertices
-
-          if(natts > 0) then
-             write(* ,*) 'ATM: ==== data attributes ===='
-             call parse_attr_list(ncid, natts, k, attr_grid_total)
-             write(*, *)
-             write(*, *) "ATM: attr_grid_total (lon): ", trim(attr_grid_total)
-             write(*, *)
-          endif
-       end if
-
-       if(index(trim(name), 'lat') /= 0) then
-          allocate(y_vertices(num_vertices_lat))
-
-          status = nf90_get_var( ncid, k, y_cells ) 
-          if (status /= nf90_noerr) then
-             write(*, *) "ATM: ***** n90_get_var error (ocean) *****"
-             write(*, *) "ATM: status: ", status
-             stop 
-          endif
-
-                    ! Corection
-          ! Assumption:
-          !    - whole erath (360 degrees laongitude, 180 degrees latitude)
-          !    - cell and corner centered coordinates
-          correction_value_lat = 180.0 / ((num_vertices_lat - 1) * 2)
-          write(*, *) "ATM: correction_value_lat: ", correction_value_lat
-          if( (y_cells(1) - (-90.0)) > 1e-10) then
-             write(*, *) "ATM: Cell centered values"
-             do i = 1, num_vertices_lat - 1
-                y_vertices(i) = y_cells(i) - correction_value_lat  !0.5
-             end do
-          else
-             write(*, *) "ATM: Cell centered values"
-          end if
-          y_vertices(num_vertices_lat) = 90.0
-
-          if(natts > 0) then
-!             write(* ,*) 'ATM: ==== data attributes ===='
-             call parse_attr_list(ncid, natts, k, attr_grid_total)
-             write(*, *)
-             write(*, *) "ATM: attr_grid_total (lat): ", trim(attr_grid_total)
-             write(*, *)
-          endif
-       end if
-
-
-    enddo
-
-
-! Allocate and fill the vertex arrays (for longitude and lattitude
-    num_vertices = num_vertices_lon * num_vertices_lat
-    
-    ! Output of the attributes
-    if(natt > 0) then
-       call parse_attr_list(ncid, natt, nf90_global, attr_grid_total)
-       write(*, *)
-       write(*, *) "ATM: attr_grid_total (global): ", trim(attr_grid_total)
-       write(*, *)
-     endif
-
-  end subroutine read_grid_from_netcdf
 
   !=============================================================================
   subroutine parse_attr_list( ncid, n_attr_loc, varid, attr_grid_total )
@@ -963,10 +853,10 @@ CONTAINS
           name = trim(name)
           attr_grid_total = trim(attr_grid_total)
 
-          write(attr_grid_total, '(A, "; ", A, " ", A)') trim(attr_grid_total), trim(name), trim(c1d)
-          write(*, *) "ATM attrgrid_total (in subroutine): ", trim(attr_grid_total) 
+          !write(attr_grid_total, '(A, "; ", A, " ", A)') trim(attr_grid_total), trim(name), trim(c1d)
+          !write(*, *) "OCN attrgrid_total (in subroutine): ", trim(attr_grid_total) 
        else if ( xtype == NF90_INT ) then
-          write(*, *) "ATM: Attribute type is NF90_INT"
+          write(*, *) "OCN: Attribute type is NF90_INT"
           if (len > 1) then
              allocate( ivals(len) )
              status = nf90_get_att(ncid, varid, name, ivals )
@@ -976,9 +866,9 @@ CONTAINS
              status = nf90_get_att(ncid, varid, name, ivals )
              if (status /= 0) stop 'error calling get_att for integer'
           endif
-          write(*, *) "ATM: xtype_attr NF90_INT: ", xtype
+          write(*, *) "OCN: xtype_attr NF90_INT: ", xtype
        else if( xtype == NF90_FLOAT ) then
-          write(*, *) "ATM: Attribute type is NF90_FLOAT"
+          write(*, *) "OCN: Attribute type is NF90_FLOAT"
           if (len > 1) then
              allocate( rvals(len) )
              status = nf90_get_att(ncid, varid, name, rvals )
@@ -989,7 +879,7 @@ CONTAINS
              if(status /= 0) stop "error calling get_att for real"
           endif
        else if( xtype == NF90_DOUBLE ) then
-          write(*, *) "ATM: Attribute type is NF90_DOUBLE"
+          write(*, *) "OCN: Attribute type is NF90_DOUBLE"
           if (len > 1) then
              allocate( rvals(len) )
              status = nf90_get_att(ncid, varid, name, rvals )
