@@ -116,7 +116,7 @@ CONTAINS
     call yac_fdef_component_metadata(comp_name, comp_metadata)
     
     ! Retrieve communicator for MESSy server component
-    CALL yac_fget_comp_comm(comp_id, comp_comm)
+    ! CALL yac_fget_comp_comm(comp_id, comp_comm)
 
     ! Get component rank
     CALL MPI_Comm_rank(comp_comm, comp_rank, ierror)
@@ -513,18 +513,18 @@ CONTAINS
                   timestep, timestep_unit, def_field)
              write(*, *) "After yac_fdef_field dim = 4"
              ! Get field
-             CALL yac_fget(k, num_points, 1, field, info, ierror)
+ !            CALL yac_fget(k, num_points, 1, field, info, ierror)
 
              ! Get field name from field id
-             field_name = yac_fget_field_name(field_id)
+!             field_name = yac_fget_field_name(field_id)
 
-             IF (info /= YAC_ACTION_NONE) THEN
-                ! Print some debugging output
-                DO i = 1, collection_size
-                   WRITE(*, debug_format) &
-                        comp_name, field_name, i, MINVAL(field(:,i)), MAXVAL(field(:,i))
-                END DO
-             END IF
+!             IF (info /= YAC_ACTION_NONE) THEN
+ !               ! Print some debugging output
+  !              DO i = 1, collection_size
+   !                WRITE(*, debug_format) &
+    !                    comp_name, field_name, i, MINVAL(field(:,i)), MAXVAL(field(:,i))
+     !           END DO
+      !       END IF
 
              deallocate(field_float_4d)
 

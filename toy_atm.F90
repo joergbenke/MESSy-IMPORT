@@ -252,8 +252,11 @@ CONTAINS
 
     ! ! Set mask for cell centers
     ! CALL yac_fset_mask(cell_sea_land_mask >= 0, cell_point_id)
-    
 
+!    open( unit = 10, file = "test", status='new')
+!    call yac_fset_grid_output_file(grid_name, "test")
+!    close(unit = 10)
+    
     attr_grid_total = ''
     do k = 1, nvar
        name = ''
@@ -526,7 +529,7 @@ CONTAINS
           write(*, *) "ATM: After yac_fdef_field_metadata"
 
           ! Put field
-          CALL yac_fput(k, num_vertices, 1, 1, field_float_4d, info, ierror)
+          ! CALL yac_fput(k, num_vertices, 1, 1, field_float_4d, info, ierror)
        end if
 
        
