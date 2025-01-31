@@ -6,6 +6,8 @@ start_date: 2000-01-01T00:00:00
 end_date: 2000-01-01T00:00:05
 calendar: proleptic-gregorian
 timestep_unit: ISO_format
+#debug:
+# - output_grids: test_grid
 coupling:
 - src_component: atm_comp
   tgt_component: ocn_comp
