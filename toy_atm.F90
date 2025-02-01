@@ -559,7 +559,8 @@ CONTAINS
        end if
 
        
-       if(index(trim(name), 'lon') /= 0) then
+       if(index(trim(attr_grid_total), 'degrees_east') /= 0) then
+!       if(index(trim(name), 'lon') /= 0) then
           
           status = nf90_get_var( ncid, k, x_cells ) !(/ 1,1,1 /) )
           if (status /= nf90_noerr) then
@@ -596,7 +597,8 @@ CONTAINS
           cycle
        end if
 
-       if(index(trim(name), 'lat') /= 0) then
+       if(index(trim(attr_grid_total), 'degrees_north') /= 0) then
+!       if(index(trim(name), 'lat') /= 0) then
 !          allocate(y_vertices(num_vertices_lat))
 
           status = nf90_get_var( ncid, k, y_cells ) 
