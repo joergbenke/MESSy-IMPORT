@@ -66,8 +66,6 @@ CONTAINS
     integer :: ncid
     ! Number of dimensions, variables, attributes and time steps in netCDF file
     integer :: ndim, nvar, natt, k_un
-    ! Number of vertices (longitude, lattidtude, total)
-    integer :: num_vertices_lon, num_vertices_lat, num_vertices
     ! Number of attributes, datatype of variable, number of dimensions, lenght of dimension
     integer :: natts, xtype, ndims, len
     integer :: k, status
@@ -136,7 +134,7 @@ CONTAINS
     
     ! Open netCDF file
     write(*, *)
-    write(*, *) "----- OCNN: Open ocean netCDF file -----"
+    write(*, *) "----- OCN: Open ocean netCDF file -----"
     status = nf90_open(trim(grid_filename), nf90_nowrite, ncid)
     if(status /= nf90_noerr) then
        write(*, *) 'OCN: Could not open ', grid_filename
@@ -174,23 +172,13 @@ CONTAINS
        list_dimension_attr(k)%number_of_dim = k
        list_dimension_attr(k)%len_of_dim = len
        write(list_dimension_attr(k)%name_of_dim, '(A)') name
-    
-       ! read number vertices in longitude directions (vertex is midpoint of cell)
-       if(index(trim(name), 'lon') /= 0) then
-          num_vertices_lon = len
-       end if
-
-       ! read number vertices in lattitude directions (vertex is midpoint of cell)
-       if(index(trim(name), 'lat') /= 0) then
-          num_vertices_lat = len
-       end if
     enddo ! do k = 1, ndim
-
 
     
     ! Read variables first part, to get the lon and lat out
-    write(attr_grid_total, '(A)') ''
+    attr_grid_total = ''
     do k = 1, nvar
+       write(*, *) "OCN: Read variables, first part"
        name = ''
        status = nf90_inquire_variable(ncid, k, name, xtype, ndims, dimids, natts)
        if (status /= nf90_noerr) then
@@ -205,50 +193,25 @@ CONTAINS
        if(natts > 0) then
           call parse_attr_list(ncid, natts, k, attr_grid_total)
           write(*, *)
-          write(*, *) "OCN: attr_grid_total: ", trim(attr_grid_total)
+          write(*, *) "1st OCN: attr_grid_total: ", trim(attr_grid_total)
           write(*, *)
        endif
        
+       ! read number vertices in longitude directions (vertex is midpoint of cell)
        if(index(trim(attr_grid_total), 'degrees_east') /= 0) then
-          write(*, *) "1st lon units degrees_east"
-          write(*, *) "1st lon ", trim(attr_grid_total)
+          num_vertices_lon = list_dimension_attr(dimids(1))%len_of_dim
+          write(*, *) "OCN: 1st lon units degrees_east"
+          write(*, *) "OCN: 1st lon ", trim(attr_grid_total)
+          write(*, *) "OCN: num_vertices_lon: ", num_vertices_lon
        endif
 
+       ! read number vertices in lattitude directions (vertex is midpoint of cell)
        if(index(trim(attr_grid_total), 'degrees_north') /= 0) then
-          write(*, *) "1st lat units degrees north"
-          write(*, *) "1st lat ", trim(attr_grid_total)
+          num_vertices_lat = list_dimension_attr(dimids(1))%len_of_dim
+          write(*, *) "OCN: 1st lat units degrees north"
+          write(*, *) "OCN: 1st lat ", trim(attr_grid_total)
+          write(*, *) "OCN: num_vertices_lat: ", num_vertices_lat
        endif
-
-       
-       if(xtype == NF90_DOUBLE) THEN
-          if(ndims == 1) then
-             write(*, *) "OCN: Type DOUBLE 1d"
-             write(*, *) "OCN: list_dimension_attr%len_of_dim: ", list_dimension_attr(dimids(1))%len_of_dim
-             allocate(field_double_1d(list_dimension_attr(dimids(1))%len_of_dim))
-             write(*, *) "After allocation of field_double_1d"
-
-             ! Get values fron variable
-             write(*, *) "OCN: Before nf90_get_var"
-             status = nf90_get_var( ncid, k, field_double_1d ) 
-             if (status /= nf90_noerr) then
-                write(*, *) "***** OCN: n90_get_var error *****"
-                write(*, *) "OCN: status nf90_get_var: ", status
-                stop 
-             endif
-
-             ! Output of field
-             write(*, *) "OCN: field_double_1d"
-             write(*, *) field_double_1d
-             write(*, *) "OCN: After nf90_get_var"
-
-             ! Define field
-             write(*, *) "OCN Before yac_fdef_field"
-             CALL yac_fdef_field ( &
-                  name, comp_id, point_ids, num_point_ids, collection_size, &
-                  timestep, timestep_unit, def_field)
-             write(*, *) "After yac_fdef_field"
-          endif
-       end if
     end do
     ! END Read variables first part, to get the lon and lat out
     
@@ -845,16 +808,16 @@ CONTAINS
        status = nf90_inquire_attribute(ncid, varid, name, xtype, len, kk)
 
        if (xtype == NF90_CHAR) then
-          if (len > 1024) then
-             write(*,*) 'truncating attribute to length:', 1024
+          if (len > 256) then
+             write(*,*) 'truncating attribute to length:', 256
           endif
           status = nf90_get_att(ncid, varid, name, c1d )
           if (status /= 0) stop 'error calling get_att'
           name = trim(name)
           attr_grid_total = trim(attr_grid_total)
-
-          !write(attr_grid_total, '(A, "; ", A, " ", A)') trim(attr_grid_total), trim(name), trim(c1d)
-          !write(*, *) "OCN attrgrid_total (in subroutine): ", trim(attr_grid_total) 
+!          write(attr_grid_total, '(A, " ", A, " ", A, "; ")') trim(attr_grid_total), trim(name), trim(c1d)
+          write(attr_grid_total, '(A, " ", A, "; ")') trim(name), trim(c1d)
+          write(*, *) "ATM: attr_grid_total: ", trim(attr_grid_total)
        else if ( xtype == NF90_INT ) then
           write(*, *) "OCN: Attribute type is NF90_INT"
           if (len > 1) then
